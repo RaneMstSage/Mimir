@@ -26,9 +26,11 @@ Termux on Android 10+ (arm64) is the supported environment; the project is devel
 **PC (Linux, macOS, WSL) with the Android NDK.** The same commands work; the native stage cross-compiles
 when it sees the NDK. Untested on Windows proper.
 
-    # Android Studio → SDK Manager → SDK Tools: install "NDK (Side by side)" and "Android SDK Build-Tools"
+    # Android Studio → SDK Manager → SDK Tools: install "NDK (Side by side)" (Gradle installs missing platforms itself)
     export ANDROID_HOME=~/Android/Sdk                       # or wherever Studio put it
     export ANDROID_NDK_HOME=$ANDROID_HOME/ndk/<version>
+    export JAVA_HOME=<a JDK 21+>                            # e.g. Android Studio's bundled one: .../android-studio/jbr
+    export PATH=$JAVA_HOME/bin:$PATH
     # Ruby 3.x, Node 18+, and: gem install opal
     ruby bin/build.rb fetch
     ruby bin/build.rb mruby          # host build (mrbc, mruby) + android-arm64 cross build (libmruby.a)
@@ -36,7 +38,9 @@ when it sees the NDK. Untested on Windows proper.
     ruby bin/build.rb gbuild         # Gradle debug APK in app/build/outputs/apk/debug/
 
 `mruby` uses mruby's own NDK toolchain support; `native` links with the NDK's clang and checks the result
-with `llvm-readelf`. Gradle finds the SDK via `ANDROID_HOME`. The pure-Ruby packaging path (`build`,
+with `llvm-readelf`. Gradle runs through the committed wrapper (9.7.1), finds the SDK via `ANDROID_HOME`, and
+signs debug builds with Android's default debug keystore unless `tools/debug.keystore` exists. Verified on
+Arch Linux with NDK 30 and Studio's JBR 25 (2026-09-10). The pure-Ruby packaging path (`build`,
 `install`, `bundle`) is Termux-oriented; on a PC use the `g*` Gradle commands. Android Studio can open the
 project directly once `ruby bin/build.rb mrb native opal` has produced the staged artifacts.
 

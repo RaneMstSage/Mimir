@@ -63,3 +63,5 @@ Design target: what a modern desktop browser does, in a compact dark theme.
 - [ ] Downloads and file chooser (uploads) in pages
 - [ ] Tab reordering; bookmark folders drag; history "clear last hour/day"
 - [ ] Offline DevTools frontend (bundle the frontend or WebViewAssetLoader cache)
+
+- [x] PC build path verified (Arch Linux, NDK 30, Studio JBR 25): mruby cross build, NDK-linked libmimir.so passes the gate, 21 tests, Opal, Gradle APK. Issue #1 closed.
