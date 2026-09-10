@@ -110,8 +110,29 @@ public final class BillingSupport implements Support {
         if (r.getResponseCode() != BillingClient.BillingResponseCode.OK) ruby.event("billing.error", "text", r.getDebugMessage());
     }
 
+    /** Verify Google's RSA signature over the purchase JSON with the app's licensing public key. */
+    static boolean verify(String json, String signature) {
+        if (BuildInfo.PLAY_PUBLIC_KEY.isEmpty()) return true;      // key not configured: skip
+        try {
+            byte[] der = android.util.Base64.decode(BuildInfo.PLAY_PUBLIC_KEY, android.util.Base64.DEFAULT);
+            java.security.PublicKey key = java.security.KeyFactory.getInstance("RSA").generatePublic(new java.security.spec.X509EncodedKeySpec(der));
+            java.security.Signature sig = java.security.Signature.getInstance("SHA1withRSA");
+            sig.initVerify(key);
+            sig.update(json.getBytes("UTF-8"));
+            return sig.verify(android.util.Base64.decode(signature, android.util.Base64.DEFAULT));
+        } catch (Exception e) {
+            Log.w(TAG, "signature check failed", e);
+            return false;
+        }
+    }
+
     private void handlePurchase(Purchase p) {
         if (p.getPurchaseState() != Purchase.PurchaseState.PURCHASED) return;
+        if (!verify(p.getOriginalJson(), p.getSignature())) {
+            Log.w(TAG, "purchase signature invalid; ignoring");
+            ruby.event("billing.error", "text", "Purchase could not be verified");
+            return;
+        }
         client.consumeAsync(ConsumeParams.newBuilder().setPurchaseToken(p.getPurchaseToken()).build(), (r, token) -> {
             if (r.getResponseCode() == BillingClient.BillingResponseCode.OK) {
                 for (String id : p.getProducts()) ruby.event("billing.purchased", "product", id);
