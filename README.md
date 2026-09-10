@@ -1,19 +1,63 @@
 # Mímir
 
+**A developer-tools browser for Android, written in Ruby.**
 
-**Mímir** (formerly Inspect Element) — named for the Norse sage whose head counsels Odin with hidden knowledge: a browser that shows what is under a page. Built for doing web work and The Odin Project coursework from a Galaxy Tab S10+ in DeX.
-A standalone Android developer-tools browser for the Galaxy Tab S10+ (DeX-friendly, no adb),
-developed entirely on the tablet in Termux. Ruby runs the app logic and DevTools relay inside the
-APK (mruby via JNI); the UI is Ruby compiled with Opal; Java is thin view glue. The DevTools pane
-is the real Chrome DevTools frontend attached in-process to the app's own WebView.
+Mímir is a tabbed browser built on the system WebView (Chromium) with the *real* Chrome DevTools
+attached in-process: Elements, Styles, Console, Network, Sources with breakpoints. No adb, no
+developer options, no desktop. Made for doing web work and [The Odin Project](https://www.theodinproject.com/)
+coursework from a tablet, and it runs happily in Samsung DeX.
 
-See PLAN.md for architecture and research, TASKS.md for progress.
+Named for the Norse sage whose counsel reveals hidden knowledge.
 
-## Build (Termux)
-    ruby bin/build.rb fetch     # once: vendor mruby 4.0.0 + mruby-json
-    ruby bin/build.rb mruby     # once: build libmruby.a / mrbc / mruby with Termux clang
-    ruby bin/build.rb install   # build APK and hand it to the system installer
-    ruby bin/build.rb test      # run ruby/ tests under the built mruby CLI
+## Features
 
-Toolchain: pkg install aapt2 d8 apksigner zip clang make patchelf; OpenJDK 21 (javac);
-tools/android.jar from the platform-35 zip; tools/debug.keystore via keytool (see PLAN.md).
+- **DevTools on any page**: the Chrome DevTools frontend docked right or bottom, tap-to-inspect, live CSS editing.
+- **Desktop-class chrome**: tabs with favicons and close buttons, omnibox with history and bookmark suggestions,
+  desktop/mobile site toggle.
+- **Bookmarks like Chrome**: bookmarks bar, Other bookmarks, nested folders, star popup, full manager.
+- **History** grouped by day with search.
+- **Settings** laid out like Chrome's: search engine, home page, force dark, text size, JavaScript,
+  cookies, clear data, DevTools defaults.
+- **Scripts & styles**: per-site user JavaScript and CSS with URL patterns, run at page start or end,
+  import `.user.js` files, and block unwanted requests. The extension substitute.
+
+## How it is built
+
+Everything is developed *on the tablet* in Termux. There is no Gradle and no Android Studio.
+
+| Layer | Language | Where |
+|---|---|---|
+| App logic, tab model, bookmarks, scripts, DevTools relay | Ruby ([mruby](https://mruby.org) 4.0, embedded via JNI) | `ruby/` |
+| Browser chrome (tabs, toolbar, pages) | Ruby compiled to JavaScript with [Opal](https://opalrb.com) | `ui/` |
+| Native host: WebViews, JNI shim | Java + a little C | `android/`, `native/` |
+| Build pipeline | Ruby | `bin/build.rb` |
+
+The DevTools trick: Android WebView opens a DevTools socket for its own process, and Chromium admits
+connections from the app's own user id. A small Ruby relay strips the browser `Origin` header the
+frontend sends (which Chromium would otherwise reject) and the real DevTools UI connects through it.
+
+## Install
+
+Download `Mimir-release.apk` from [Releases](https://github.com/RaneMstSage/Mimir/releases) and open it
+with your file manager. Play Store listing: coming.
+
+## Build from source (Termux, Android 10+)
+
+    pkg install clang make aapt2 d8 apksigner zip patchelf openjdk-21 nodejs
+    gem install opal                       # Ruby 3.x
+    ruby bin/build.rb fetch                # vendors mruby 4.0.0 and mruby-json
+    ruby bin/build.rb mruby                # builds libmruby with Termux clang (once)
+    ruby bin/build.rb test                 # Ruby tests under the built mruby
+    ruby bin/build.rb install              # debug APK -> ~/storage/downloads/Mimir.apk
+
+You also need `tools/android.jar` (from the Android platform-35 zip) and a debug keystore
+(`keytool -genkeypair -keystore tools/debug.keystore -storepass android -keypass android -alias inspect -keyalg RSA`).
+See `PLAN.md` for the architecture and `TASKS.md` for progress.
+
+## Support
+
+Mímir is free and open source. If it earns a place in your workflow, the About page has a Donate link.
+
+## License
+
+See `LICENSE`.
