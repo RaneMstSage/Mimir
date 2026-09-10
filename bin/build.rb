@@ -131,7 +131,7 @@ def native
      '-ffunction-sections', '-fdata-sections', '-Wall',
      '-DMRB_UTF8_STRING', '-DMRB_INT64', '-DMRB_USE_DEBUG_HOOK', '-DMRB_DEBUG',
      '-I', File.join(MRUBY_SRC, 'include'), '-I', File.join(MRUBY_OUT, 'host', 'include'),
-     '-Wl,-soname,libmimir.so', '-Wl,-z,max-page-size=16384', '-Wl,--no-undefined', '-Wl,-z,defs',
+     '-Wl,-soname,libmimir.so', '-Wl,--build-id=sha1', '-Wl,-z,max-page-size=16384', '-Wl,--no-undefined', '-Wl,-z,defs',
      '-Wl,--exclude-libs,ALL', '-Wl,--gc-sections',
      '-o', SO_UNSTRIPPED, *srcs, MRUBY_LIB, '-llog', '-lm')
   sh('patchelf', '--remove-rpath', SO_UNSTRIPPED)
@@ -139,6 +139,11 @@ def native
   sh('llvm-strip', '--strip-unneeded', '-o', tmp, SO_UNSTRIPPED)
   gate(tmp)                       # only a library that passes the gate becomes libmimir.so
   FileUtils.mv(tmp, SO_OUT)
+  # Play Console "native debug symbols": zip of <abi>/<lib>.so with symbols, uploaded per release.
+  sym_dir = File.join(BUILD, 'symbols', 'arm64-v8a'); FileUtils.mkdir_p(sym_dir)
+  FileUtils.cp(SO_UNSTRIPPED, File.join(sym_dir, File.basename(SO_OUT)))
+  sym_zip = File.join(BUILD, 'native-debug-symbols.zip'); FileUtils.rm_f(sym_zip)
+  Dir.chdir(File.join(BUILD, 'symbols')) { sh('zip', '-q', '-r', sym_zip, 'arm64-v8a') }
   puts "✓ #{SO_OUT} (#{(File.size(SO_OUT) / 1024).round} KB; unstripped kept for symbolizing)"
 end
 
