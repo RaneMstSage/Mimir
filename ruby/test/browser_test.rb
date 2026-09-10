@@ -1,0 +1,66 @@
+test "UrlNorm: schemes, hosts, searches" do
+  assert_equal "https://example.com", UrlNorm.normalize("example.com")
+  assert_equal "https://example.com/a b", UrlNorm.normalize("https://example.com/a b")
+  assert_equal "about:blank", UrlNorm.normalize("about:blank")
+  assert_equal "https://localhost:8765/x", UrlNorm.normalize("localhost:8765/x")
+  assert_equal "https://www.google.com/search?q=ruby+on+android%3F", UrlNorm.normalize("ruby on android?")
+  assert_equal "https://www.google.com/search?q=hello", UrlNorm.normalize("hello")
+  assert_equal nil, UrlNorm.normalize("   ")
+end
+
+Inspect.emitted.clear
+settings = Settings.new(nil)
+browser = Browser.new(settings)
+module App ; def self.attach_devtools(url) ; Inspect.emit({ "cmd" => "attach", "url" => url }.to_json) ; end ; end
+
+test "Browser: new tab emits create+show+state, ids increment" do
+  t1 = browser.new_tab(nil)
+  assert_equal 1, t1.id
+  assert_equal settings["home"], t1.url
+  cmds = Inspect.emitted.map { |c| c["cmd"] }
+  assert cmds.include?("tab.create") && cmds.include?("tab.show") && cmds.include?("ui.state"), cmds.inspect
+  t2 = browser.new_tab("https://b.test/")
+  assert_equal 2, t2.id
+  assert_equal t2, browser.current
+end
+
+test "Browser: closing current selects neighbour; closing last resets to home" do
+  browser.close_tab(2)
+  assert_equal 1, browser.current.id
+  Inspect.emitted.clear
+  browser.close_tab(1)
+  assert_equal 1, browser.tabs.size
+  assert_equal settings["home"], browser.tabs[0].url
+  assert Inspect.emitted.any? { |c| c["cmd"] == "tab.load" }
+end
+
+test "Browser: page events update state; title falls back to url" do
+  browser.page_started(1, "https://x.test/p")
+  browser.page_title(1, "")
+  assert_equal "https://x.test/p", browser.current.title
+  browser.page_progress(1, 50)
+  st = Inspect.emitted.last["state"]
+  assert_equal 50, st["progress"]
+  assert_equal true, st["loading"]
+end
+
+test "Browser: navigate normalizes and emits tab.load" do
+  Inspect.emitted.clear
+  browser.navigate(1, "ruby lang")
+  load = Inspect.emitted.find { |c| c["cmd"] == "tab.load" }
+  assert_equal "https://www.google.com/search?q=ruby+lang", load["url"]
+end
+
+test "Browser: devtools toggle docks and attaches current url; ua toggle reloads" do
+  Inspect.emitted.clear
+  browser.toggle_devtools
+  cmds = Inspect.emitted.map { |c| c["cmd"] }
+  assert_equal ["devtools.dock", "attach", "ui.state"], cmds
+  browser.toggle_devtools
+  assert_equal "devtools.close", Inspect.emitted[-2]["cmd"]
+  Inspect.emitted.clear
+  browser.toggle_ua
+  assert_equal false, browser.desktop?
+  assert Inspect.emitted.any? { |c| c["cmd"] == "ua.set" && c["desktop"] == false }
+  assert Inspect.emitted.any? { |c| c["cmd"] == "tab.reload" }
+end
