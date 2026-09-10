@@ -58,7 +58,7 @@ PayPal instead of Google Play tips.
 
 You also need `tools/android.jar` (from the Android platform-35 zip) and a debug keystore
 (`keytool -genkeypair -keystore tools/debug.keystore -storepass android -keypass android -alias inspect -keyalg RSA`).
-See `PLAN.md` for the architecture and `TASKS.md` for progress.
+See `CONTRIBUTING.md` for the architecture and `TASKS.md` for progress.
 
 ## Support
 

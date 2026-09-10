@@ -27,3 +27,5 @@ tools/sdk/
 .idea/
 *.iml
 .kotlin/
+# internal planning notes (not published)
+PLAN.local.md

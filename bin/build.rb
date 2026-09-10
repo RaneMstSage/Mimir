@@ -104,7 +104,7 @@ def check_tools
   needed += %w[clang patchelf llvm-strip llvm-nm readelf] unless CROSS
   needed.each { |t| abort "missing tool: #{t}" unless system("command -v #{t} >/dev/null 2>&1") }
   abort "missing #{JAR} — download platform zip into tools/" unless File.exist?(JAR)
-  abort "missing #{KS} — run keytool (see PLAN.md)" unless File.exist?(KS)
+  abort "missing #{KS} — run keytool (see README)" unless File.exist?(KS)
 end
 
 # Vendor mruby (pinned tag) and mruby-json (pinned in vendor/PINS after first fetch).
@@ -298,7 +298,7 @@ def gen_buildinfo
 end
 
 def release_creds
-  abort "missing #{RELEASE_KS} / #{RELEASE_ENV} (see PLAN.md: release signing)" unless File.exist?(RELEASE_KS) && File.exist?(RELEASE_ENV)
+  abort "missing #{RELEASE_KS} / #{RELEASE_ENV} (see README: release signing)" unless File.exist?(RELEASE_KS) && File.exist?(RELEASE_ENV)
   env = File.read(RELEASE_ENV).scan(/^(\w+)=(.*)$/).to_h
   [env['MIMIR_KEYSTORE_PASS'], env['MIMIR_KEY_ALIAS'] || 'mimir']
 end

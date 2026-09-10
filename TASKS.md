@@ -1,4 +1,4 @@
-# Task list (mirrors PLAN.md; one commit per step)
+# Task list (one commit per step)
 
 
 ### Phase 0 — Prove the foundation (small)
