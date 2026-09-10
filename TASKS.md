@@ -23,13 +23,20 @@
 - [x] `lib/tabs.rb` (Browser/Tab), `lib/urlnorm.rb`, `lib/settings.rb`, event handlers in `app.rb`; `MainActivity` rewritten as a logic-free view host driven by `ui.state` + commands; `DevToolsClient.java` deleted; Java fallback relay reports `bridge.java_ready`.
 - [x] `bin/build.rb test`: 14 tests green under the built mruby CLI (relay, devtools, urlnorm, browser model).
 
-### Phase 4 — UI in Ruby via Opal (large)
-User's explicit choice; the review flags cost (≈1 MB JS runtime, IME/focus quirks with nested WebViews, an extra
-DevTools target to filter, replaces ~150 Java lines). Kept, sequenced last, minimal footprint.
-- [ ] `ui/ui.rb` (plain DOM via Opal `Native`/`$$`, no opal-jquery), `ui.html/css`; `bin/build.rb opal` → `assets/ui/ui.js`.
-- [ ] Chrome WebView + `@JavascriptInterface host.send(json)` → `Native.post`; `ui.state` → `UI.receive(json)`; filter the chrome WebView out of DevTools targets; IME handling for URL field.
-- [ ] Remove XML toolbar/tab strip. Commit.
+### Phase 4 — Browser chrome in Ruby via Opal (large)
+Design target: what a modern desktop browser does, in a compact dark theme.
+- [ ] Toolchain: `bin/build.rb opal` compiles `ui/*.rb` → `android/assets/ui/` (runtime once, app bundle separately); Opal 1.8.3 verified.
+- [ ] Chrome WebView + `@JavascriptInterface host.send(json)` → Ruby events; `ui.state` → `UI.receive(json)`; filter the chrome WebView out of DevTools targets; IME/focus handling for the URL field.
+- [ ] Tab strip: favicon + title, **× close on each tab**, `+` new tab, active state, scroll, middle/long-press close, drag order (later).
+- [ ] Toolbar: back/forward/reload/stop, omnibox with search + suggestions from history/bookmarks, ★ bookmark toggle, Desktop/Mobile, DevTools, dock, ⋮ menu.
+- [ ] **Bookmarks**: star current page, bookmarks bar toggle, manager (rename/delete/folders), stored by Ruby in `bookmarks.json`.
+- [ ] History (recent pages) for omnibox suggestions; stored by Ruby.
+- [ ] Remove XML toolbar/tab strip; keep Rb pane as a developer drawer.
 
-### Phase 5 — Polish
-- [ ] Offline DevTools frontend (assets via Ruby loop or WebViewAssetLoader), `extractNativeLibs=false` + `bin/apkzip.rb` aligner (drop `zip` dependency), release keystore, DeX window behaviour, icons/about page.
+### Phase 5 — Settings, scripts, polish
+- [ ] **Settings page** (Ruby-owned, Opal-rendered): search engine, homepage, desktop mode default, JavaScript, cookies/3rd-party, force dark, text zoom, clear browsing data, DevTools defaults (dock side, theme, screencast).
+- [ ] **Scripts & styles** (the extension substitute): per-site user JS/CSS injected at document-start/end, enable/disable, import from URL; request blocking/rewrite rules via `shouldInterceptRequest`.
+- [ ] Offline DevTools frontend; `extractNativeLibs=false` + Ruby zip aligner; release keystore; DeX window behaviour; about page (mruby/Chromium versions).
 
+## Notes
+- Engine is Android System WebView = Chromium (Blink/V8), system-updated. No Chrome extensions (browser-layer feature; needs a Chromium fork). Cannot read Chrome's profile/sync/cookies (app sandbox).
