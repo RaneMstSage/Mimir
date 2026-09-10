@@ -43,7 +43,7 @@ Design target: what a modern desktop browser does, in a compact dark theme.
 - [x] Play bundle: `aapt2 link --proto-format` + bundletool 1.18.3 → `build/Mimir.aab` (validated); `bin/build.rb bundle --play` hides Donate
 - [ ] Store listing assets: icon (adaptive), feature graphic, screenshots (DeX), short/long description, privacy policy (no data collection)
 - [x] About page: licenses (mruby, mruby-json, Opal MIT; DevTools frontend BSD), version, Donate + Source links (from mimir.config.json)
-- [ ] GitHub repo + Releases with APK (Obtainium-friendly); README for users
+- [~] GitHub repo https://github.com/RaneMstSage/Mimir — pushed (clean history, MIT, README). First Release (APK) pending on-device check of Scripts.
 - [~] Monetization: user open to Play Billing donations; Billing 9.1 = 50 transitive libs (AndroidX, Kotlin stdlib, Firebase encoders, Play Services) → deferred past v1 (needs a Ruby Maven/AAR resolver). v1: paid or free listing; external Donate in GitHub build only.
 - [ ] Pre-release QA checklist: fresh install, settings/bookmarks/scripts persistence, DevTools attach, DeX resize, rotation, back button, external links, downloads (not yet handled), file chooser (not yet handled)
 
