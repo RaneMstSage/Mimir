@@ -219,7 +219,10 @@ end
 # which hides the Donate link (Play requires its own billing for in-app tips).
 def gen_buildinfo
   cfg = JSON.parse(File.read(File.join(ROOT, 'mimir.config.json'))) rescue {}
-  play = ARGV.include?('--play')
+  # Play Store artifacts (.aab) always hide the external donate link (Play billing policy);
+  # sideload/GitHub/debug builds keep it and use it as the fallback when Play is unavailable.
+  cmd = ARGV.reject { |a| a.start_with?('--') }[0]
+  play = ARGV.include?('--play') || %w[bundle gbundle].include?(cmd)
   donate = play ? '' : cfg['donate_url'].to_s
   src = <<~JAVA
     package com.mstsage.mimir;
