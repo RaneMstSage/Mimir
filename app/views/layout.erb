@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0f172a">
+<title>Inspect Element</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icon-192.png">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header>
+  <a class="brand" href="/"><img src="/icon-192.png" alt="" width="28" height="28"> Inspect Element</a>
+  <nav>
+    <a href="/" class="<%= request.path == '/' ? 'on' : '' %>">Tabs</a>
+    <a href="/setup" class="<%= request.path == '/setup' ? 'on' : '' %>">Setup</a>
+  </nav>
+  <span id="pill" class="pill">…</span>
+</header>
+<main><%= yield %></main>
+<script src="/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+# build outputs
+build/
+# large / secret toolchain artifacts (regenerate: see PLAN.md)
+tools/android.jar
+tools/*.zip
+tools/debug.keystore
+# ruby
+*.gem
+.bundle/
+# editor / os
+*.swp
+.DS_Store
