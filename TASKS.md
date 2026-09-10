@@ -39,4 +39,5 @@ Design target: what a modern desktop browser does, in a compact dark theme.
 - [ ] Offline DevTools frontend; `extractNativeLibs=false` + Ruby zip aligner; release keystore; DeX window behaviour; about page (mruby/Chromium versions).
 
 ## Notes
+- Opal gotcha (cost us three 'renders but invisible' bugs): the last expression of a method gets `return`; a backtick with `a; b` there runs only `a`. `bin/build.rb opal` now lints for it; use `UI.show/hide`.
 - Engine is Android System WebView = Chromium (Blink/V8), system-updated. No Chrome extensions (browser-layer feature; needs a Chromium fork). Cannot read Chrome's profile/sync/cookies (app sandbox).
