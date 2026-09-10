@@ -20,6 +20,6 @@ tools/release.keystore
 tools/release.env
 tools/bundletool.jar
 app/build/
-.gradle/
 local.properties
 tools/sdk/
+.gradle/

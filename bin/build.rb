@@ -355,7 +355,8 @@ def gradle(task)
   mrb; native; opal
   gradle_manifest
   puts "→ gradle #{task}"
-  args = ['gradle', '--console=plain', '-q']
+  wrapper = File.join(ROOT, 'gradlew')
+  args = [File.exist?(wrapper) ? wrapper : 'gradle', '--console=plain', '-q']   # wrapper pins Gradle 9.7.1 everywhere
   args << "-Pandroid.aapt2FromMavenOverride=#{ENV['PREFIX']}/bin/aapt2" if ON_TERMUX   # AGP's aapt2 is x86; use Termux's
   ok = system({ 'JAVA_TOOL_OPTIONS' => '-Dfile.encoding=UTF-8' }, *args, task, chdir: ROOT)
   abort '✗ gradle failed' unless ok
