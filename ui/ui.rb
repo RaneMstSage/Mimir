@@ -279,8 +279,7 @@ module UI
       ["page:settings", "Settings", "›"],
       ["page:about", "About Mímir", ""]
     ]
-    donate = (@state["version"] || {})["donate"].to_s
-    rows.insert(-2, ["donate", "Support Mímir", "♥"]) unless donate.empty?
+    rows.insert(-2, ["page:support", "Support Mímir", "♥"])
     html = rows.map { |r| r == :hr ? "<hr>" : "<button class=\"m\" data-act=\"#{r[0]}\"><span>#{r[1]}</span><small>#{r[2]}</small></button>" }.join
     show(m, html)
     sync_height
@@ -338,6 +337,7 @@ module UI
     if act.start_with?("page:")
       @page = act[5..-1]
       @page = nil if @page == "close"
+      send("support.open") if @page == "support"
       @section = nil
       @filter = ""
       render_menu
@@ -400,6 +400,8 @@ module UI
       send("bookmark.update", "id" => `String(#{target}.dataset.id || "")`, "parent" => `String(#{target}.value || "")`)
     when "bookmarks.bar"   then send("bookmarks.bar")
     when "ua.toggle", "devtools.toggle", "dock.toggle", "dev.toggle", "devtools.chrome", "settings.open", "about", "donate" then send(act)
+    when "billing.buy" then send("billing.buy", "product" => `String(#{target}.dataset.id || "")`)
+    when "billing.retry" then send("support.open")
     end
     render_menu
   end
@@ -442,7 +444,7 @@ module UI
     unless @page
       `#{pg}.hidden = true` ; return
     end
-    title = { "settings" => "Settings", "history" => "History", "bookmarks" => "Bookmarks", "about" => "About", "scripts" => "Scripts & styles" }[@page] || @page
+    title = { "settings" => "Settings", "history" => "History", "bookmarks" => "Bookmarks", "about" => "About", "scripts" => "Scripts & styles", "support" => "Support Mímir" }[@page] || @page
     search = @page == "history" || @page == "bookmarks" ? "<input type=\"search\" placeholder=\"Search #{title.downcase}\" value=\"#{esc(@filter)}\" oninput=\"UI.filter(this.value)\">" : ""
     nav = ""
     body = case @page
@@ -453,6 +455,7 @@ module UI
            when "history"  then history_body
            when "bookmarks" then nav = bookmarks_nav ; bookmarks_body
            when "scripts"  then scripts_body
+           when "support"  then support_body
            when "about"    then about_body
            else "<div class=\"empty\">Unknown page</div>"
            end
@@ -606,6 +609,27 @@ module UI
       "name" => v.call("sc-name"), "type" => v.call("sc-type"), "run_at" => v.call("sc-runat"),
       "match" => v.call("sc-match").split("\n"), "code" => v.call("sc-code") })
     `document.activeElement && document.activeElement.blur()`
+  end
+
+  def self.support_body
+    bl = @state["billing"] || {}
+    donate = (@state["version"] || {})["donate"].to_s
+    intro = "<div class=\"card\"><div class=\"row\"><div class=\"l about\"><b>Mímir is free and open source</b>" \
+            "Built by one developer on a tablet. If it earns a place in your workflow, a tip keeps the work going. Tips are one-time and go through Google Play.</div></div></div>"
+    body = case bl["status"]
+           when "ready"
+             tiers = (bl["products"] || []).map do |pr|
+               "<div class=\"row\"><div class=\"l\"><b>#{esc(pr["title"])}</b><small>#{esc(pr["description"])}</small></div><button class=\"btn\" style=\"background:#be185d;min-width:96px\" data-act=\"billing.buy\" data-id=\"#{esc(pr["id"])}\">#{esc(pr["price"])}</button></div>"
+             end
+             tiers.empty? ? "<div class=\"empty\">No tip options are configured in Play yet.</div>" : "<h2>Leave a tip</h2><div class=\"card\">#{tiers.join}</div>"
+           when "unavailable"
+             ext = donate.empty? ? "" : "<div class=\"row\"><div class=\"l\"><b>Donate online</b><small>#{esc(donate)}</small></div><button class=\"btn\" style=\"background:#be185d\" data-act=\"donate\">♥ Open</button></div>"
+             "<h2>Google Play not available</h2><div class=\"card\"><div class=\"row\"><div class=\"l\"><b>This copy can't use Play Billing</b><small>#{esc(bl["reason"])}</small></div><button class=\"btn\" data-act=\"billing.retry\">Retry</button></div>#{ext}</div>"
+           else
+             "<div class=\"empty\">Checking Google Play…</div>"
+           end
+    thanks = bl["thanks"] ? "<div class=\"card\" style=\"margin-top:12px\"><div class=\"row\"><div class=\"l\"><b>♥ Thank you!</b><small>Your support means a lot.</small></div></div></div>" : ""
+    intro + body + thanks
   end
 
   def self.about_body

@@ -412,9 +412,12 @@ when 'opal'    then opal
 when 'build'   then build
 when 'release' then release
 when 'gradle'  then gradle(ARGV[1] || ':app:assembleDebug')
+when 'ginstall' then out = gradle(':app:assembleDebug'); FileUtils.cp(out, File.join(Dir.home, 'storage', 'downloads', 'Mimir.apk')); system('am', 'start', '-a', 'android.intent.action.VIEW_DOWNLOADS', out: File::NULL, err: File::NULL); puts 'APK copied to Downloads/Mimir.apk — tap it in the file manager to install.'
+when 'grelease' then gradle(':app:assembleRelease')
+when 'gbundle'  then gradle(':app:bundleRelease')
 when 'bundle'  then build; bundle
 when 'install' then build; install
 when 'run'     then run
 when 'clean'   then Dir[File.join(BUILD, '*')].each { |f| FileUtils.rm_rf(f) unless File.basename(f) == 'mruby' }; puts 'cleaned (kept build/mruby)'
-else abort 'usage: bin/build.rb [fetch|mruby|mrb|native|opal|test|build|release|bundle|gradle <task>|install|run|clean] [--play]'
+else abort 'usage: bin/build.rb [fetch|mruby|mrb|native|opal|test|build|release|bundle|gradle <task>|ginstall|grelease|gbundle|install|run|clean] [--play]'
 end
