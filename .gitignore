@@ -23,3 +23,7 @@ app/build/
 local.properties
 tools/sdk/
 .gradle/
+# IDE metadata
+.idea/
+*.iml
+.kotlin/
