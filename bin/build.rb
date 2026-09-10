@@ -301,7 +301,7 @@ def bundle
   apks = File.join(BUILD, 'Mimir.apks')
   FileUtils.rm_f(apks)
   sh('java', '-jar', BUNDLETOOL, 'build-apks', "--bundle=#{OUT_AAB}", "--output=#{apks}", '--mode=universal',
-     "--aapt2=#{`command -v aapt2`.strip}", "--ks=#{RELEASE_KS}", "--ks-key-alias=#{alias_}", "--ks-pass=pass:#{pass}", "--key-pass=pass:#{pass}", quiet: true)
+     "--aapt2=#{ENV['PATH'].split(':').map { |d| File.join(d, 'aapt2') }.find { |f| File.executable?(f) }}", "--ks=#{RELEASE_KS}", "--ks-key-alias=#{alias_}", "--ks-pass=pass:#{pass}", "--key-pass=pass:#{pass}", quiet: true)
   chk = File.join(BUILD, 'aab-check'); FileUtils.rm_rf(chk); FileUtils.mkdir_p(chk)
   sh('unzip', '-q', '-o', apks, 'universal.apk', '-d', chk, quiet: true)
   sh('apksigner', 'verify', File.join(chk, 'universal.apk'), quiet: true)
