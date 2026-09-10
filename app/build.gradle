@@ -1,7 +1,7 @@
 import groovy.json.JsonSlurper
 
 plugins {
-    id 'com.android.application' version '9.3.2'
+    id 'com.android.application' version '9.1.1'
 }
 
 def cfg = new JsonSlurper().parse(file("${rootDir}/mimir.config.json"))
