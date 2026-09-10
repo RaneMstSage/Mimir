@@ -23,9 +23,28 @@ MRUBY_TAG  = '4.0.0'
 JSON_SRC   = File.join(VENDOR, 'mruby-json')
 JSON_REPO  = 'https://github.com/mattn/mruby-json.git'
 MRUBY_OUT  = File.join(BUILD, 'mruby')
-MRUBY_LIB  = File.join(MRUBY_OUT, 'host', 'lib', 'libmruby.a')
+ON_TERMUX  = File.directory?('/data/data/com.termux')
+NDK        = ENV['ANDROID_NDK_HOME'].to_s
+CROSS      = !ON_TERMUX && !NDK.empty?            # PC with the Android NDK: cross-compile the native parts
+abort 'On a PC set ANDROID_NDK_HOME to the Android NDK (the native library must target Android arm64).' if !ON_TERMUX && NDK.empty? && !%w[test opal mrb fetch].include?(ARGV.reject { |a| a.start_with?('--') }[0].to_s)
+MRUBY_LIB  = File.join(MRUBY_OUT, CROSS ? 'android-arm64' : 'host', 'lib', 'libmruby.a')
 MRBC       = File.join(MRUBY_OUT, 'host', 'bin', 'mrbc')
 MRUBY_BIN  = File.join(MRUBY_OUT, 'host', 'bin', 'mruby')
+
+# NDK prebuilt toolchain directory for this host OS.
+def ndk_bin
+  host = case RUBY_PLATFORM
+         when /darwin/ then 'darwin-x86_64'
+         when /mingw|mswin/ then 'windows-x86_64'
+         else 'linux-x86_64'
+         end
+  dir = File.join(NDK, 'toolchains', 'llvm', 'prebuilt', host, 'bin')
+  abort "NDK toolchain not found at #{dir}" unless File.directory?(dir)
+  dir
+end
+def tool(name) ; CROSS ? File.join(ndk_bin, name) : name ; end
+def cc_cmd     ; CROSS ? [File.join(ndk_bin, 'clang'), '--target=aarch64-linux-android26'] : ['clang'] ; end
+def readelf_cmd ; CROSS ? tool('llvm-readelf') : 'readelf' ; end
 RUBY_DIR   = File.join(ROOT, 'ruby')
 NATIVE_DIR = File.join(ROOT, 'native')
 STAGE      = File.join(BUILD, 'stage')                       # extra APK entries: lib/, assets/
@@ -58,7 +77,9 @@ def newer?(srcs, target)
 end
 
 def check_tools
-  %w[aapt2 javac d8 apksigner zip clang patchelf llvm-strip llvm-nm readelf].each { |t| abort "missing tool: #{t} (pkg install #{t})" unless system("command -v #{t} >/dev/null") }
+  needed = %w[aapt2 javac d8 apksigner zip]
+  needed += %w[clang patchelf llvm-strip llvm-nm readelf] unless CROSS
+  needed.each { |t| abort "missing tool: #{t}" unless system("command -v #{t} >/dev/null 2>&1") }
   abort "missing #{JAR} — download platform zip into tools/" unless File.exist?(JAR)
   abort "missing #{KS} — run keytool (see PLAN.md)" unless File.exist?(KS)
 end
@@ -99,7 +120,7 @@ def mruby
     puts out.lines.last(60).join
     abort '✗ mruby build failed'
   end
-  abort "✗ #{MRUBY_LIB} missing after build" unless File.exist?(MRUBY_LIB)
+  abort "✗ #{MRUBY_LIB} missing after build (CROSS=#{CROSS})" unless File.exist?(MRUBY_LIB)
   puts "✓ built #{MRUBY_LIB} (#{(File.size(MRUBY_LIB) / 1024).round} KB), #{MRBC}, #{MRUBY_BIN}"
 end
 
@@ -127,16 +148,16 @@ def native
   end
   FileUtils.mkdir_p(SO_DIR)
   Dir[File.join(SO_DIR, '*.so')].each { |f| FileUtils.rm_f(f) }   # never ship a stale/renamed library
-  sh('clang', '-shared', '-fPIC', '-O2', '-g', '-std=gnu11', '-fvisibility=hidden',
+  sh(*cc_cmd, '-shared', '-fPIC', '-O2', '-g', '-std=gnu11', '-fvisibility=hidden',
      '-ffunction-sections', '-fdata-sections', '-Wall',
      '-DMRB_UTF8_STRING', '-DMRB_INT64', '-DMRB_USE_DEBUG_HOOK', '-DMRB_DEBUG',
      '-I', File.join(MRUBY_SRC, 'include'), '-I', File.join(MRUBY_OUT, 'host', 'include'),
      '-Wl,-soname,libmimir.so', '-Wl,--build-id=sha1', '-Wl,-z,max-page-size=16384', '-Wl,--no-undefined', '-Wl,-z,defs',
      '-Wl,--exclude-libs,ALL', '-Wl,--gc-sections',
      '-o', SO_UNSTRIPPED, *srcs, MRUBY_LIB, '-llog', '-lm')
-  sh('patchelf', '--remove-rpath', SO_UNSTRIPPED)
+  sh('patchelf', '--remove-rpath', SO_UNSTRIPPED) unless CROSS    # Termux's clang injects a RUNPATH; the NDK's does not
   tmp = SO_OUT + '.tmp'
-  sh('llvm-strip', '--strip-unneeded', '-o', tmp, SO_UNSTRIPPED)
+  sh(tool('llvm-strip'), '--strip-unneeded', '-o', tmp, SO_UNSTRIPPED)
   gate(tmp)                       # only a library that passes the gate becomes libmimir.so
   FileUtils.mv(tmp, SO_OUT)
   # Play Console "native debug symbols": zip of <abi>/<lib>.so with symbols, uploaded per release.
@@ -149,16 +170,16 @@ end
 
 # Refuse to ship a library the Android loader would reject or that leaks Termux dependencies.
 def gate(so)
-  dyn = sh('readelf', '-d', so, quiet: true)
+  dyn = sh(readelf_cmd, '-d', so, quiet: true)
   needed = dyn.scan(/\(NEEDED\)\s+Shared library: \[([^\]]+)\]/).flatten
   bad = needed - ALLOWED_NEEDED
   abort "✗ gate: unexpected NEEDED #{bad.inspect}" unless bad.empty?
   abort '✗ gate: RUNPATH/RPATH present' if dyn =~ /\((RUNPATH|RPATH)\)/
   abort '✗ gate: TEXTREL present' if dyn =~ /TEXTREL/
-  loads = sh('readelf', '-lW', so, quiet: true).lines.grep(/^\s*LOAD/)
+  loads = sh(readelf_cmd, '-lW', so, quiet: true).lines.grep(/^\s*LOAD/)
   aligns = loads.map { |l| l.split.last.hex }
   abort "✗ gate: LOAD alignment #{aligns.inspect} < 0x4000" if aligns.any? { |a| a < 0x4000 }
-  exported = sh('llvm-nm', '-D', '--defined-only', so, quiet: true).lines.map { |l| l.split.last }
+  exported = sh(tool('llvm-nm'), '-D', '--defined-only', so, quiet: true).lines.map { |l| l.split.last }
   exported -= %w[edata etext end _edata _etext _end]   # linker-provided, harmless
   abort "✗ gate: unexpected exports #{exported.inspect}" unless exported == ['JNI_OnLoad']
   puts "✓ gate: NEEDED=#{needed.join(',')} align=0x#{aligns.min.to_s(16)} exports=JNI_OnLoad"
@@ -330,7 +351,9 @@ def gradle(task)
   mrb; native; opal
   gradle_manifest
   puts "→ gradle #{task}"
-  ok = system({ 'JAVA_TOOL_OPTIONS' => '-Dfile.encoding=UTF-8' }, 'gradle', '--console=plain', '-q', task, chdir: ROOT)
+  args = ['gradle', '--console=plain', '-q']
+  args << "-Pandroid.aapt2FromMavenOverride=#{ENV['PREFIX']}/bin/aapt2" if ON_TERMUX   # AGP's aapt2 is x86; use Termux's
+  ok = system({ 'JAVA_TOOL_OPTIONS' => '-Dfile.encoding=UTF-8' }, *args, task, chdir: ROOT)
   abort '✗ gradle failed' unless ok
   out = Dir[File.join(ROOT, 'app', 'build', 'outputs', '**', '*.{apk,aab}')].max_by { |f| File.mtime(f) }
   puts "✓ #{out} (#{(File.size(out) / 1024.0).round} KB)" if out
@@ -420,6 +443,7 @@ when 'opal'    then opal
 when 'build'   then build
 when 'release' then release
 when 'gradle'  then gradle(ARGV[1] || ':app:assembleDebug')
+when 'gbuild'   then gradle(':app:assembleDebug')
 when 'ginstall' then out = gradle(':app:assembleDebug'); FileUtils.cp(out, File.join(Dir.home, 'storage', 'downloads', 'Mimir.apk')); system('am', 'start', '-a', 'android.intent.action.VIEW_DOWNLOADS', out: File::NULL, err: File::NULL); puts 'APK copied to Downloads/Mimir.apk — tap it in the file manager to install.'
 when 'grelease' then gradle(':app:assembleRelease')
 when 'gbundle'  then gradle(':app:bundleRelease')
@@ -427,5 +451,5 @@ when 'bundle'  then build; bundle
 when 'install' then build; install
 when 'run'     then run
 when 'clean'   then Dir[File.join(BUILD, '*')].each { |f| FileUtils.rm_rf(f) unless File.basename(f) == 'mruby' }; puts 'cleaned (kept build/mruby)'
-else abort 'usage: bin/build.rb [fetch|mruby|mrb|native|opal|test|build|release|bundle|gradle <task>|ginstall|grelease|gbundle|install|run|clean] [--play]'
+else abort 'usage: bin/build.rb [fetch|mruby|mrb|native|opal|test|build|release|bundle|gradle <task>|gbuild|ginstall|grelease|gbundle|install|run|clean] [--play]'
 end
