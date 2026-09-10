@@ -353,7 +353,9 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
             devtoolsView.setWebChromeClient(new WebChromeClient() {
                 @Override public boolean onConsoleMessage(android.webkit.ConsoleMessage m) {
                     Log.d(TAG, "devtools: " + m.message());
-                    if (m.messageLevel() == android.webkit.ConsoleMessage.MessageLevel.ERROR) status("frontend console: " + m.message());
+                    // Protocol-domain noise (e.g. "Request Autofill.setAddresses failed": WebView lacks
+                    // that domain) goes to the Rb log, not the status line.
+                    if (m.messageLevel() == android.webkit.ConsoleMessage.MessageLevel.ERROR) appendRubyLog("[devtools] " + m.message());
                     return true;
                 }
             });
