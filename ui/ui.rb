@@ -176,7 +176,7 @@ module UI
              "<button class=\"star#{starred ? ' on' : ''}\" data-act=\"bookmark.toggle\" aria-label=\"Bookmark\">#{starred ? '★' : '☆'}</button>" \
              "<div id=\"prog\" style=\"width:#{@state["loading"] ? @state["progress"].to_i : 0}%\"></div>" \
            "</div>" \
-           "<button class=\"ib txt\" data-act=\"ua.toggle\">#{desktop ? 'Desktop' : 'Mobile'}</button>" \
+           "<button class=\"ib txt\" data-act=\"ua.toggle\" title=\"#{desktop ? 'Desktop site' : 'Mobile site'}\"><span class=\"label\">#{desktop ? 'Desktop' : 'Mobile'}</span><span class=\"icon\" aria-hidden=\"true\">#{desktop ? '🖥' : '📱'}</span></button>" \
            "<button class=\"ib#{dt["open"] ? ' on' : ' acc'}\" data-act=\"devtools.toggle\" title=\"DevTools\">⚙</button>" \
            "<button class=\"ib\" data-act=\"menu.toggle\">⋮</button>"
     input = el("url")
