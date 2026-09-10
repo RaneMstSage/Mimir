@@ -45,9 +45,9 @@ Design target: what a modern desktop browser does, in a compact dark theme.
 - [x] About page: licenses (mruby, mruby-json, Opal MIT; DevTools frontend BSD), version, Donate + Source links (from mimir.config.json)
 - [~] GitHub repo https://github.com/RaneMstSage/Mimir — pushed (clean history, MIT, README). First Release (APK) pending on-device check of Scripts.
 - [~] Monetization: Play Billing donations (tip jar) — user wants it. Billing 9.1 pulls 50 AAR/JAR deps, so packaging moves to **Gradle 9.7 + AGP 9.4 in Termux** (aapt2 override, hand-made tools/sdk) while Ruby keeps building mruby/native/bytecode/Opal and invokes Gradle (`bin/build.rb gradle <task>`). Proving the toolchain now.
-  - [ ] Gradle assembleDebug succeeds on device
-  - [ ] `Billing.java`: BillingClient connect, queryProductDetails (inapp: tip_small/tip_medium/tip_large), launchBillingFlow, consume; events to Ruby
-  - [ ] Ruby/Opal: Support page with tiers, thank-you state; Donate link stays for GitHub build
+  - [x] Gradle 9.7 + AGP 9.4 assembleDebug succeeds on device (tools/sdk: platform-35 + build-tools 36 with Termux aapt2/d8; aapt placeholder)
+  - [x] `Support` interface + Gradle-only `BillingSupport` (connect, queryProductDetails for tip_small/tip_medium/tip_large, launchBillingFlow, consume, leftover-purchase sweep); events to Ruby; R8 keep rules
+  - [x] Ruby/Opal: Support page (tiers with Play prices, thank-you, Play-unavailable fallback with external Donate link); menu → Support Mímir ♥
   - [ ] Play Console: create the three consumable in-app products (user)
 - [ ] Pre-release QA checklist: fresh install, settings/bookmarks/scripts persistence, DevTools attach, DeX resize, rotation, back button, external links, downloads (not yet handled), file chooser (not yet handled)
 

@@ -16,10 +16,13 @@ class Browser
   attr_reader :tabs, :current, :settings
   attr_accessor :devtools_open
 
+  attr_reader :billing
+
   def initialize(settings, bookmarks = nil, scripts = nil)
     @settings = settings
     @bookmarks = bookmarks
     @scripts = scripts
+    @billing = { "status" => "unknown", "products" => [], "thanks" => false, "reason" => "" }
     @tabs = []
     @current = nil
     @next_id = 1
@@ -232,6 +235,7 @@ class Browser
       "bookmarks_bar" => @settings["bookmarks_bar"] ? true : false,
       "settings" => @settings.to_h,
       "scripts" => @scripts ? @scripts.list : [],
+      "billing" => @billing,
       "blocks" => @scripts ? @scripts.blocks : [],
       "version" => { "app" => App::VERSION, "ruby" => Inspect.version, "donate" => (App.boot || {})["donate_url"].to_s, "source" => (App.boot || {})["source_url"].to_s },
       "devtools" => { "open" => @devtools_open, "side" => @settings["dock_side"], "fraction" => @settings["dock_fraction"] }

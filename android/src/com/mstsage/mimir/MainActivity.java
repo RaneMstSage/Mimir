@@ -81,6 +81,7 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
     private String devtoolsTheme = "dark";
     private boolean devtoolsScreencast = false;
     private DevToolsBridge fallbackBridge;
+    private final Support support = Support.create();
 
     // ------------------------------------------------------------------ lifecycle
 
@@ -134,6 +135,7 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
         }
 
         ruby.setListener(this);
+        support.connect(this, ruby);
         final String startUrl = urlFromIntent(getIntent());
         main.post(() -> {
             ruby.start(this);
@@ -169,6 +171,7 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
     @Override
     protected void onDestroy() {
         ruby.setListener(null);
+        support.destroy();
         if (fallbackBridge != null) fallbackBridge.stop();
         for (WebView w : tabs.values()) w.destroy();
         if (devtoolsView != null) devtoolsView.destroy();
@@ -195,6 +198,8 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
                 case "tab.inject": { WebView w = tabs.get(cmd.getInt("tab")); if (w != null) w.evaluateJavascript(cmd.optString("js"), null); break; }
                 case "block.rules": setBlockRules(cmd.optJSONArray("patterns")); break;
                 case "fetch": fetchForRuby(cmd.optString("url"), cmd.optString("purpose")); break;
+                case "billing.query": support.query(); break;
+                case "billing.buy": support.buy(this, cmd.optString("product")); break;
                 case "devtools.prefs": devtoolsTheme = cmd.optString("theme", "dark"); devtoolsScreencast = cmd.optBoolean("screencast", false); break;
                 case "data.clear": clearData(cmd); break;
                 case "ui.state": renderState(cmd.getJSONObject("state")); break;
