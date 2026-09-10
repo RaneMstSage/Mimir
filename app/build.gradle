@@ -82,6 +82,7 @@ android {
 tasks.register('rubyStages', Exec) {
     workingDir rootDir
     commandLine 'ruby', "${rootDir}/bin/build.rb", 'mrb', 'native', 'opal'
+    environment 'ANDROID_HOME', android.sdkDirectory.absolutePath      // lets build.rb find ndk/<version> without shell exports
     onlyIf { System.getenv('MIMIR_FROM_BUILD_RB') == null }
 }
 tasks.matching { it.name == 'preBuild' }.configureEach { dependsOn 'rubyStages' }

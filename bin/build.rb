@@ -24,12 +24,31 @@ JSON_SRC   = File.join(VENDOR, 'mruby-json')
 JSON_REPO  = 'https://github.com/mattn/mruby-json.git'
 MRUBY_OUT  = File.join(BUILD, 'mruby')
 ON_TERMUX  = File.directory?('/data/data/com.termux')
-NDK        = ENV['ANDROID_NDK_HOME'].to_s
+
+# Locate an Android NDK on a PC when ANDROID_NDK_HOME is not exported (IDE-launched Gradle has no
+# shell environment): SDK dir from ANDROID_HOME / ANDROID_SDK_ROOT / local.properties / the default
+# Studio locations, then the highest ndk/<version> inside it.
+def discover_ndk
+  return ENV['ANDROID_NDK_HOME'] if ENV['ANDROID_NDK_HOME'].to_s != ''
+  sdk_dirs = [ENV['ANDROID_HOME'], ENV['ANDROID_SDK_ROOT']].compact
+  lp = File.join(ROOT, 'local.properties')
+  sdk_dirs << File.read(lp)[/^sdk\.dir=(.*)$/, 1].to_s.gsub('\\:', ':') if File.exist?(lp)
+  sdk_dirs += [File.join(Dir.home, 'Android', 'Sdk'), File.join(Dir.home, 'Library', 'Android', 'sdk')]
+  sdk_dirs.each do |sdk|
+    next if sdk.to_s.empty?
+    versions = Dir[File.join(sdk, 'ndk', '*')].select { |d| File.directory?(File.join(d, 'toolchains')) }
+    return versions.max_by { |d| File.basename(d).split('.').map(&:to_i) } unless versions.empty?
+  end
+  ''
+end
+NDK        = ON_TERMUX ? '' : discover_ndk.to_s
 CROSS      = !ON_TERMUX && !NDK.empty?            # PC with the Android NDK: cross-compile the native parts
 if CROSS && !File.directory?(File.join(NDK, 'toolchains'))
   abort "ANDROID_NDK_HOME=#{NDK} is not an NDK directory (no toolchains/ inside). Install 'NDK (Side by side)' in Android Studio's SDK Manager, then point ANDROID_NDK_HOME at e.g. ~/Android/Sdk/ndk/<version>."
 end
-abort 'On a PC set ANDROID_NDK_HOME to the Android NDK (the native library must target Android arm64).' if !ON_TERMUX && NDK.empty? && !%w[test opal mrb fetch].include?(ARGV.reject { |a| a.start_with?('--') }[0].to_s)
+if !ON_TERMUX && NDK.empty? && !(ARGV.reject { |a| a.start_with?('--') } - %w[test opal mrb fetch]).empty? == false
+  abort 'On a PC the Android NDK is required (the native library must target Android arm64): install "NDK (Side by side)" in the SDK Manager, or set ANDROID_NDK_HOME.'
+end
 MRUBY_LIB  = File.join(MRUBY_OUT, CROSS ? 'android-arm64' : 'host', 'lib', 'libmruby.a')
 MRBC       = File.join(MRUBY_OUT, 'host', 'bin', 'mrbc')
 MRUBY_BIN  = File.join(MRUBY_OUT, 'host', 'bin', 'mruby')
