@@ -228,7 +228,8 @@ module UI
         rows << "<button class=\"d\" data-act=\"open\" data-url=\"#{esc(c["url"])}\"><img src=\"#{esc(favicon(c))}\" alt=\"\"><span>#{esc(c["title"])}</span></button>"
       end
     end
-    x = `(function(){ var b = document.querySelector('[data-act="bmfolder"][data-id="' + #{@bm_folder.to_s} + '"]'); return b ? Math.round(b.getBoundingClientRect().left) : 8; })()`
+    btn = `document.querySelector('[data-act="bmfolder"][data-id="' + #{@bm_folder.to_s} + '"]')`
+    x = `#{btn} ? Math.round(#{btn}.getBoundingClientRect().left) : 8`
     `#{d}.style.left = Math.min(#{x}, window.innerWidth - 350) + 'px'`
     `#{d}.style.top = '110px'`
     show(d, rows.join)
