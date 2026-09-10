@@ -54,3 +54,12 @@ Design target: what a modern desktop browser does, in a compact dark theme.
 ## Notes
 - Opal gotcha (cost us three 'renders but invisible' bugs): the last expression of a method gets `return`; a backtick with `a; b` there runs only `a`. `bin/build.rb opal` now lints for it; use `UI.show/hide`.
 - Engine is Android System WebView = Chromium (Blink/V8), system-updated. No Chrome extensions (browser-layer feature; needs a Chromium fork). Cannot read Chrome's profile/sync/cookies (app sandbox).
+
+## Phase 7 — After launch (0.9)
+- [ ] **Incognito mode**: separate WebView profile per incognito tab (no history/bookmarks writes, in-memory cookies/storage, cleared on close), visual cue in the tab strip, "New incognito tab" in the menu
+- [ ] Pin androidx.fragment 1.9.0 shipped (done in code; ships with 0.8.5)
+- [ ] Phone-portrait verification of 0.8.4 (toolbar, menu scroll, bottom dock)
+- [ ] Tip purchase end-to-end with a license tester account
+- [ ] Downloads and file chooser (uploads) in pages
+- [ ] Tab reordering; bookmark folders drag; history "clear last hour/day"
+- [ ] Offline DevTools frontend (bundle the frontend or WebViewAssetLoader cache)
