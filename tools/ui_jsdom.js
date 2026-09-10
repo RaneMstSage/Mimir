@@ -20,7 +20,9 @@ try { window.UI.receive(JSON.stringify(st)); } catch (e) { errors.push('receive:
 report('after receive');
 const click = (el) => el.dispatchEvent(new window.MouseEvent('click', { bubbles: true, cancelable: true }));
 try {
-  click(doc.querySelector('[data-act="menu.toggle"]')); click(doc.querySelector('[data-act="page:settings"]'));
+  click(doc.querySelector('[data-act="menu.toggle"]'));
+  console.log('menu expands chrome:', sent.some(s => s.ev === 'chrome.height' && s.expand === true), '| menu visible:', !doc.getElementById('menu').hidden);
+  click(doc.querySelector('[data-act="page:settings"]'));
   console.log('settings page:', doc.getElementById('page').innerHTML.includes('Search engine'));
   click(doc.querySelector('[data-act="section:privacy"]')); console.log('privacy section:', doc.getElementById('page').innerHTML.includes('JavaScript'));
   click(doc.querySelector('[data-act="page:close"]')); click(doc.querRelector ? null : doc.querySelector('[data-act="menu.toggle"]')); click(doc.querySelector('[data-act="page:history"]'));

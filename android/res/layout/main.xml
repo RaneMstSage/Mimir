@@ -1,13 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
     android:background="#0f172a">
 
-    <!-- Browser chrome: tabs, toolbar, bookmarks — HTML rendered from Ruby (Opal), see ui/ -->
-    <WebView
-        android:id="@+id/chrome"
+<LinearLayout
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical">
+
+    <!-- Reserves space for the chrome WebView, which floats above (see bottom of file) -->
+    <View
+        android:id="@+id/chrome_space"
         android:layout_width="match_parent"
         android:layout_height="80dp"
         android:background="#020617" />
@@ -102,3 +106,12 @@
         </LinearLayout>
     </LinearLayout>
 </LinearLayout>
+
+    <!-- Browser chrome: tabs, toolbar, bookmarks, menus, pages — HTML rendered from Ruby (Opal), see ui/.
+         Transparent; grows to full height while a dropdown or page is open. -->
+    <WebView
+        android:id="@+id/chrome"
+        android:layout_width="match_parent"
+        android:layout_height="80dp"
+        android:layout_gravity="top" />
+</FrameLayout>

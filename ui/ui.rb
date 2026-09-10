@@ -48,8 +48,16 @@ module UI
     render_toolbar
     render_bookmarks
     render_page
-    height = @page ? -1 : 80 + (@state["bookmarks_bar"] ? 28 : 0)
-    `window.host && window.host.send(#{ { "ev" => "chrome.height", "dp" => height }.to_json })`
+    sync_height
+  end
+
+  # Collapsed height = tabs + toolbar (+ bookmarks bar). While a dropdown or page is open the
+  # transparent chrome layer expands over the page so the popup is not clipped.
+  def self.sync_height
+    dp = 80 + (@state["bookmarks_bar"] ? 28 : 0)
+    suggest_open = `!#{el("suggest")}.hidden`
+    expand = !!(@page || @menu_open || suggest_open)
+    `window.host && window.host.send(#{ { "ev" => "chrome.height", "dp" => dp, "expand" => expand }.to_json })`
   end
 
   def self.render_tabs
@@ -110,7 +118,7 @@ module UI
   def self.render_menu
     m = el("menu")
     unless @menu_open
-      `#{m}.hidden = true` ; return
+      `#{m}.hidden = true` ; sync_height ; return
     end
     dt = @state["devtools"] || {}
     rows = [
@@ -130,19 +138,21 @@ module UI
     ]
     html = rows.map { |r| r == :hr ? "<hr>" : "<button class=\"m\" data-act=\"#{r[0]}\"><span>#{r[1]}</span><small>#{r[2]}</small></button>" }.join
     `#{m}.innerHTML = #{html}; #{m}.hidden = false`
+    sync_height
   end
 
   def self.render_suggest(q)
     box = el("suggest")
     q = q.to_s.downcase
     if q.empty?
-      `#{box}.hidden = true` ; return
+      `#{box}.hidden = true` ; sync_height ; return
     end
     pool = (@state["bookmarks"].map { |b| b.merge("k" => "★") } + @state["history"].map { |h| h.merge("k" => "⌚") })
     hits = pool.select { |e| e["url"].to_s.downcase.include?(q) || e["title"].to_s.downcase.include?(q) }.first(6)
     html = hits.map { |e| "<button class=\"s\" data-act=\"open\" data-url=\"#{esc(e["url"])}\"><span class=\"k\">#{e["k"]}</span><span>#{esc(e["title"].to_s[0, 40])}</span><span class=\"u\">#{esc(e["url"])}</span></button>" }.join
     html += "<button class=\"s\" data-act=\"navigate\" data-text=\"#{esc(q)}\"><span class=\"k\">🔍</span><span>Search for “#{esc(q)}”</span></button>"
     `#{box}.innerHTML = #{html}; #{box}.hidden = false`
+    sync_height
   end
 
   # ---- input & events -------------------------------------------------------------------------
@@ -152,7 +162,7 @@ module UI
     %x{
       #{input}.addEventListener('focus', function(){ #{input}.select(); });
       #{input}.addEventListener('input', function(){ #{render_suggest(`String(#{input}.value || "")`)} });
-      #{input}.addEventListener('blur',  function(){ setTimeout(function(){ #{el("suggest")}.hidden = true; #{render_toolbar} }, 150); });
+      #{input}.addEventListener('blur',  function(){ setTimeout(function(){ #{el("suggest")}.hidden = true; #{render_toolbar}; #{sync_height} }, 150); });
       #{input}.addEventListener('keydown', function(e){
         if (e.key === 'Enter') { e.preventDefault(); #{navigate(`String(#{input}.value || "")`)}; #{input}.blur(); }
         if (e.key === 'Escape') { #{input}.blur(); }
@@ -163,6 +173,7 @@ module UI
   def self.navigate(text)
     send("navigate", "tab" => @state["current"], "text" => text)
     `#{el("suggest")}.hidden = true`
+    sync_height
   end
 
   def self.click(target)
