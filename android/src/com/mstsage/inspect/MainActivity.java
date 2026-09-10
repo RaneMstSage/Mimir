@@ -59,6 +59,7 @@ public class MainActivity extends Activity {
     private View divider;
     private FrameLayout devtoolsContainer;
     private Button btnDevtools, btnDock, btnUa;
+    private TextView statusView;
 
     private DevToolsBridge bridge;
     private DevToolsClient client;
@@ -91,6 +92,8 @@ public class MainActivity extends Activity {
         btnDevtools = findViewById(R.id.btn_devtools);
         btnDock = findViewById(R.id.btn_dock);
         btnUa = findViewById(R.id.btn_ua);
+        statusView = findViewById(R.id.status);
+        statusView.setOnLongClickListener(v -> { statusView.setVisibility(View.GONE); return true; });
 
         // The whole point: turn on WebView's DevTools server for this process.
         WebView.setWebContentsDebuggingEnabled(true);
@@ -98,8 +101,9 @@ public class MainActivity extends Activity {
         try {
             int port = bridge.start();
             client = new DevToolsClient(port);
+            status("bridge: 127.0.0.1:" + port + " -> @webview_devtools_remote_" + Process.myPid());
         } catch (Exception e) {
-            toast("DevTools bridge failed: " + e.getMessage());
+            status("DevTools bridge failed: " + e);
         }
 
         findViewById(R.id.btn_back).setOnClickListener(v -> { if (current != null && current.view.canGoBack()) current.view.goBack(); });
@@ -293,10 +297,19 @@ public class MainActivity extends Activity {
             s.setLoadWithOverviewMode(false);
             s.setSupportZoom(false);
             devtoolsView.setBackgroundColor(0xFF202124);
-            devtoolsView.setWebViewClient(new WebViewClient());
+            devtoolsView.setWebViewClient(new WebViewClient() {
+                @Override public void onReceivedError(WebView v, WebResourceRequest r, android.webkit.WebResourceError err) {
+                    if (r.isForMainFrame()) status("frontend load error: " + err.getDescription() + " " + r.getUrl());
+                }
+                @Override public void onReceivedHttpError(WebView v, WebResourceRequest r, android.webkit.WebResourceResponse resp) {
+                    if (r.isForMainFrame()) status("frontend HTTP " + resp.getStatusCode() + " " + r.getUrl());
+                }
+                @Override public void onPageFinished(WebView v, String u) { status("frontend loaded: " + u); }
+            });
             devtoolsView.setWebChromeClient(new WebChromeClient() {
                 @Override public boolean onConsoleMessage(android.webkit.ConsoleMessage m) {
                     Log.d(TAG, "devtools: " + m.message());
+                    if (m.messageLevel() == android.webkit.ConsoleMessage.MessageLevel.ERROR) status("frontend console: " + m.message());
                     return true;
                 }
             });
@@ -322,6 +335,7 @@ public class MainActivity extends Activity {
     /** Look up the current tab's DevTools target and load the frontend for it. */
     private void attachDevtools(final Tab tab) {
         final String url = tab.url;
+        status("attaching: " + url);
         new Thread(() -> {
             try {
                 JSONObject target = null;
@@ -329,14 +343,20 @@ public class MainActivity extends Activity {
                     target = client.findTarget(url, DevToolsClient.CDN);
                     if (target == null) Thread.sleep(300);
                 }
-                if (target == null) { main.post(() -> toast("No DevTools target found for this tab")); return; }
+                if (target == null) {
+                    final String list = client.get("/json/list");
+                    main.post(() -> status("no target for tab; /json/list = " + list.replace('\n', ' ')));
+                    return;
+                }
                 final String fe = client.frontendUrl(target);
+                final String tid = target.optString("id");
                 Log.i(TAG, "devtools frontend: " + fe);
+                main.post(() -> status("target " + tid + " -> " + fe));
                 main.post(() -> { if (devtoolsOpen && devtoolsView != null) devtoolsView.loadUrl(fe); });
             } catch (Exception e) {
                 Log.w(TAG, "attach failed", e);
-                final String msg = e.getMessage();
-                main.post(() -> toast("DevTools attach failed: " + msg));
+                final String msg = e.toString();
+                main.post(() -> status("attach failed: " + msg));
             }
         }, "devtools-attach").start();
     }
@@ -388,6 +408,13 @@ public class MainActivity extends Activity {
     }
 
     private void toast(String s) { Toast.makeText(this, s, Toast.LENGTH_SHORT).show(); }
+
+    /** Diagnostics line under the toolbar (long-press to hide). We cannot read logcat from Termux. */
+    private void status(String s) {
+        Log.i(TAG, s);
+        statusView.setText(s);
+        statusView.setVisibility(View.VISIBLE);
+    }
 
     @Override
     public void onBackPressed() {

@@ -2,11 +2,11 @@
 
 
 ### Phase 0 — Prove the foundation (small)
-- [ ] Remove adb mode (`git rm -r app bin/inspect`, `$PREFIX/bin/inspect` symlink, `~/.shortcuts/InspectElement`); update README/PLAN/TASKS. Commit.
-- [ ] Install + run the existing Java APK. Verify same-uid DevTools connect, Origin strip, frontend attach, Elements picker. Fix what breaks. (Runtime debugging without logcat: add a temporary in-app status text of bridge/attach errors.) Commit.
-- [ ] `bin/build.rb fetch` (clone mruby tag 4.0.0 + mruby-json into `vendor/`), `bin/build.rb mruby` (rake with `native/build_config.rb`, `MRUBY_BUILD_DIR=build/mruby`). Confirm `libmruby.a`, `mrbc`, `mruby`.
+- [x] Remove adb mode (`git rm -r app bin/inspect`, `$PREFIX/bin/inspect` symlink, `~/.shortcuts/InspectElement`); update README/PLAN/TASKS. Commit.
+- [~] Install + run the existing Java APK (built with in-app status line; installer opened, awaiting user test). Verify same-uid DevTools connect, Origin strip, frontend attach, Elements picker. Fix what breaks. (Runtime debugging without logcat: add a temporary in-app status text of bridge/attach errors.) Commit.
+- [~] `bin/build.rb fetch` done (mruby 4.0.0, mruby-json f99d942); `bin/build.rb mruby` (rake with `native/build_config.rb`, `MRUBY_BUILD_DIR=build/mruby`). Confirm `libmruby.a`, `mrbc`, `mruby`.
 - [ ] Spike with the built `mruby` CLI: `IO.select`, `TCPServer` accept, `for_fd`, `_setnonblock`, EAGAIN class, partial `syswrite`, `close_write`, `JSON.parse/generate`. Record in TASKS.md.
-- [ ] Link a hello `.so` with the production flags; `readelf` gate passes (NEEDED ⊆ libc/libm/libdl/liblog, no RUNPATH, LOAD align ≥ 0x4000). Commit.
+- [x] Link a hello `.so` with the production flags; `readelf` gate passes (NEEDED = liblog/libm/libdl/libc, no RUNPATH after patchelf, LOAD align 0x4000, only JNI_OnLoad exported; 24 KB).
 
 ### Phase 1 — Ruby executes inside the APK (medium)
 - [ ] `native/inspect.c`, `Native.java`, `RubyRuntime.java`, `ruby/app.rb` (boot → `toast "Hello from mruby <version>"`).

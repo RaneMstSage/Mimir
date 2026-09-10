@@ -62,6 +62,21 @@
         android:progress="0"
         android:visibility="gone" />
 
+    <TextView
+        android:id="@+id/status"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="#0b1220"
+        android:textColor="#94a3b8"
+        android:textSize="12sp"
+        android:paddingLeft="12dp"
+        android:paddingRight="12dp"
+        android:paddingTop="3dp"
+        android:paddingBottom="3dp"
+        android:maxLines="2"
+        android:ellipsize="end"
+        android:visibility="gone" />
+
     <!-- Page + DevTools split. Orientation switched at runtime for dock right/bottom. -->
     <LinearLayout
         android:id="@+id/split"
