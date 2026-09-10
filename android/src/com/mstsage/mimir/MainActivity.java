@@ -588,10 +588,16 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
 
     private void toast(String s) { Toast.makeText(this, s, Toast.LENGTH_SHORT).show(); }
 
+    private final Runnable hideStatus = () -> statusView.setVisibility(View.GONE);
+
+    /** Diagnostics line. Informational messages fade after a few seconds; errors stay until tapped. */
     private void status(String s) {
         Log.i(TAG, s);
         statusView.setText(s);
         statusView.setVisibility(View.VISIBLE);
+        main.removeCallbacks(hideStatus);
+        boolean sticky = s.startsWith("UI error") || s.startsWith("RUBY FATAL") || s.startsWith("attach failed") || s.startsWith("Previous run crashed") || s.contains("failed");
+        if (!sticky) main.postDelayed(hideStatus, 4000);
     }
 
     private void toggleRubyPane() {
