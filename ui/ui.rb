@@ -279,6 +279,8 @@ module UI
       ["page:settings", "Settings", "›"],
       ["page:about", "About Mímir", ""]
     ]
+    donate = (@state["version"] || {})["donate"].to_s
+    rows.insert(-2, ["donate", "Support Mímir", "♥"]) unless donate.empty?
     html = rows.map { |r| r == :hr ? "<hr>" : "<button class=\"m\" data-act=\"#{r[0]}\"><span>#{r[1]}</span><small>#{r[2]}</small></button>" }.join
     show(m, html)
     sync_height
@@ -397,7 +399,7 @@ module UI
     when "bookmark.move"
       send("bookmark.update", "id" => `String(#{target}.dataset.id || "")`, "parent" => `String(#{target}.value || "")`)
     when "bookmarks.bar"   then send("bookmarks.bar")
-    when "ua.toggle", "devtools.toggle", "dock.toggle", "dev.toggle", "devtools.chrome", "settings.open", "about" then send(act)
+    when "ua.toggle", "devtools.toggle", "dock.toggle", "dev.toggle", "devtools.chrome", "settings.open", "about", "donate" then send(act)
     end
     render_menu
   end
@@ -608,9 +610,20 @@ module UI
 
   def self.about_body
     v = @state["version"] || {}
+    donate = v["donate"].to_s
+    source = v["source"].to_s
+    support = donate.empty? ? "" :
+      "<div class=\"row\"><div class=\"l\"><b>Support Mímir</b><small>Mímir is free and open source. If it helps your work, a donation keeps it going.</small></div><button class=\"btn\" style=\"background:#be185d\" data-act=\"donate\">♥ Donate</button></div>"
+    src = source.empty? ? "" : "<div class=\"row\"><div class=\"l\"><b>Source code</b><small>#{esc(source)}</small></div><button class=\"btn\" data-act=\"open.page\" data-url=\"#{esc(source)}\">Open</button></div>"
     "<div class=\"card\"><div class=\"row\"><div class=\"l about\"><b>Mímir #{esc(v["app"])}</b>" \
-    "A developer-tools browser for Android, written in Ruby.<br>App logic and DevTools relay: mruby #{esc(v["ruby"])} embedded in the APK.<br>" \
-    "Browser chrome: Ruby compiled with Opal.<br>Engine: Android System WebView (Chromium).<br>Built on the tablet in Termux.</div></div></div>"
+    "A developer-tools browser for Android, written in Ruby — named for the Norse sage whose counsel reveals hidden knowledge.<br>" \
+    "App logic and DevTools relay: mruby #{esc(v["ruby"])} embedded in the APK. Browser chrome: Ruby compiled with Opal. Engine: Android System WebView (Chromium).<br>Built on a Galaxy Tab in Termux.</div></div>" + support + src + "</div>" \
+    "<h2>Open-source licenses</h2><div class=\"card\">" \
+    "<div class=\"row\"><div class=\"l\"><b>mruby</b><small>MIT License — mruby developers</small></div></div>" \
+    "<div class=\"row\"><div class=\"l\"><b>mruby-json</b><small>MIT License — Yasuhiro Matsumoto</small></div></div>" \
+    "<div class=\"row\"><div class=\"l\"><b>Opal</b><small>MIT License — Adam Beynon and contributors</small></div></div>" \
+    "<div class=\"row\"><div class=\"l\"><b>Chrome DevTools frontend</b><small>BSD-3-Clause — The Chromium Authors (loaded from Google's CDN)</small></div></div>" \
+    "</div>"
   end
 
   def self.boot

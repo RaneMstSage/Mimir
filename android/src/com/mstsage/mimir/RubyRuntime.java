@@ -59,6 +59,9 @@ public final class RubyRuntime {
                 boot.put("files_dir", app.getFilesDir().getAbsolutePath());
                 boot.put("cache_dir", app.getCacheDir().getAbsolutePath());
                 boot.put("app_version", BuildInfo.VERSION);
+                boot.put("donate_url", BuildInfo.DONATE_URL);
+                boot.put("source_url", BuildInfo.SOURCE_URL);
+                boot.put("play", BuildInfo.PLAY_BUILD);
                 appendLog("boot " + boot);
                 exitCode = Native.run(mrb, boot.toString());
                 appendLog("ruby thread exited with code " + exitCode);
