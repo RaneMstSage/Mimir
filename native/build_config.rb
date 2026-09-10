@@ -16,7 +16,7 @@ MRuby::Build.new do |conf|
   %w[
     mruby-compiler mruby-eval mruby-error mruby-errno mruby-catch
     mruby-sprintf mruby-math mruby-time mruby-struct mruby-set mruby-pack
-    mruby-io mruby-socket mruby-sleep
+    mruby-io mruby-socket mruby-sleep hal-posix-io hal-posix-socket
     mruby-compar-ext mruby-enum-ext mruby-string-ext mruby-numeric-ext mruby-array-ext
     mruby-hash-ext mruby-range-ext mruby-proc-ext mruby-symbol-ext mruby-object-ext
     mruby-kernel-ext mruby-class-ext mruby-toplevel-ext
