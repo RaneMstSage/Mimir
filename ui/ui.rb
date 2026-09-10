@@ -25,6 +25,24 @@ module UI
     else
       render
     end
+  rescue Exception => e
+    report_error("receive", e)
+  end
+
+  # Any UI exception: tell the host (status line + Ruby log), drop back to the plain browser state
+  # so the expanded chrome layer never gets stuck covering the page.
+  def self.report_error(where, e)
+    text = "#{where}: #{e.class}: #{e.message}"
+    bt = (e.backtrace || []).first(3).join(" | ")
+    `console.error(#{text} + " " + #{bt})`
+    `window.host && window.host.send(#{ { "ev" => "ui.error", "text" => text, "bt" => bt }.to_json })`
+    @page = nil
+    @menu_open = false
+    begin
+      `#{el("page")}.hidden = true; #{el("menu")}.hidden = true; #{el("suggest")}.hidden = true`
+      sync_height
+    rescue Exception
+    end
   end
 
   def self.el(id) ; `document.getElementById(#{id})` ; end
@@ -178,6 +196,14 @@ module UI
   end
 
   def self.click(target)
+    begin
+      click!(target)
+    rescue Exception => e
+      report_error("click", e)
+    end
+  end
+
+  def self.click!(target)
     # dataset reads come back as JS undefined when absent — coerce to Ruby strings first.
     act = `String(#{target}.dataset.act || "")`
     tab = `String(#{target}.dataset.tab || "")`
