@@ -4,8 +4,8 @@
 ### Phase 0 — Prove the foundation (small)
 - [x] Remove adb mode (`git rm -r app bin/inspect`, `$PREFIX/bin/inspect` symlink, `~/.shortcuts/InspectElement`); update README/PLAN/TASKS. Commit.
 - [~] Install + run the existing Java APK (built with in-app status line; installer opened, awaiting user test). Verify same-uid DevTools connect, Origin strip, frontend attach, Elements picker. Fix what breaks. (Runtime debugging without logcat: add a temporary in-app status text of bridge/attach errors.) Commit.
-- [~] `bin/build.rb fetch` done (mruby 4.0.0, mruby-json f99d942); `bin/build.rb mruby` (rake with `native/build_config.rb`, `MRUBY_BUILD_DIR=build/mruby`). Confirm `libmruby.a`, `mrbc`, `mruby`.
-- [ ] Spike with the built `mruby` CLI: `IO.select`, `TCPServer` accept, `for_fd`, `_setnonblock`, EAGAIN class, partial `syswrite`, `close_write`, `JSON.parse/generate`. Record in TASKS.md.
+- [x] `bin/build.rb fetch` (mruby 4.0.0, mruby-json f99d942) and `bin/build.rb mruby` → libmruby.a (11.9 MB, -g), mrbc, mruby. Needed: no mruby-print in 4.0, positional gem path, explicit hal-posix-io/hal-posix-socket.
+- [x] Spike with the built `mruby` CLI — OK: IO.select, TCPServer ephemeral + getsockname port, accept, _setnonblock, sysread→Errno::EAGAIN, syswrite returns n, IO.pipe, IO.for_fd, BasicSocket.for_fd, setsockopt SO_RCVTIMEO, JSON.parse/to_json, Struct, format, File. NOT: `close_write` on sockets (EBADF → use `shutdown(SHUT_WR)`), no Regexp (string ops only). Abstract sockaddr_un keeps the leading NUL but connect addrlen unverified → C helper as planned.
 - [x] Link a hello `.so` with the production flags; `readelf` gate passes (NEEDED = liblog/libm/libdl/libc, no RUNPATH after patchelf, LOAD align 0x4000, only JNI_OnLoad exported; 24 KB).
 
 ### Phase 1 — Ruby executes inside the APK (medium)
