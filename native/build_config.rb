@@ -17,14 +17,15 @@ GEMS = %w[
 ].freeze
 JSON_GEM = File.expand_path('../vendor/mruby-json', __dir__)
 
-def configure(conf)
+# bins: include the mrbc/mruby command-line tools (host builds only).
+def configure(conf, bins: true)
   conf.cc do |cc|
     cc.flags << '-fPIC' << '-O2' << '-g' << '-fvisibility=hidden' << '-ffunction-sections' << '-fdata-sections'
     cc.defines << 'MRB_UTF8_STRING' << 'MRB_INT64' << 'MRB_USE_DEBUG_HOOK'
   end
   conf.linker.flags << '-fPIC'
   conf.enable_debug
-  GEMS.each { |g| conf.gem core: g }
+  GEMS.each { |g| conf.gem core: g unless !bins && g.start_with?('mruby-bin-') }
   conf.gem JSON_GEM
 end
 
@@ -40,7 +41,6 @@ unless ndk.empty? || on_termux
   # PC: cross-compile the library for Android arm64 (API 26+, matching the app's minSdk).
   MRuby::CrossBuild.new('android-arm64') do |conf|
     conf.toolchain :android, arch: 'arm64-v8a', sdk_version: 26, ndk_home: ndk
-    configure(conf)
-    conf.gems.delete_if { |g| g.name.start_with?('mruby-bin-') }   # no host tools in the cross build
+    configure(conf, bins: false)                                # no command-line tools in the cross build
   end
 end

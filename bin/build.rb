@@ -26,6 +26,9 @@ MRUBY_OUT  = File.join(BUILD, 'mruby')
 ON_TERMUX  = File.directory?('/data/data/com.termux')
 NDK        = ENV['ANDROID_NDK_HOME'].to_s
 CROSS      = !ON_TERMUX && !NDK.empty?            # PC with the Android NDK: cross-compile the native parts
+if CROSS && !File.directory?(File.join(NDK, 'toolchains'))
+  abort "ANDROID_NDK_HOME=#{NDK} is not an NDK directory (no toolchains/ inside). Install 'NDK (Side by side)' in Android Studio's SDK Manager, then point ANDROID_NDK_HOME at e.g. ~/Android/Sdk/ndk/<version>."
+end
 abort 'On a PC set ANDROID_NDK_HOME to the Android NDK (the native library must target Android arm64).' if !ON_TERMUX && NDK.empty? && !%w[test opal mrb fetch].include?(ARGV.reject { |a| a.start_with?('--') }[0].to_s)
 MRUBY_LIB  = File.join(MRUBY_OUT, CROSS ? 'android-arm64' : 'host', 'lib', 'libmruby.a')
 MRBC       = File.join(MRUBY_OUT, 'host', 'bin', 'mrbc')
