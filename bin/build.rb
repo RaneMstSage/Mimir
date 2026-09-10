@@ -25,6 +25,14 @@ MRUBY_OUT  = File.join(BUILD, 'mruby')
 MRUBY_LIB  = File.join(MRUBY_OUT, 'host', 'lib', 'libmruby.a')
 MRBC       = File.join(MRUBY_OUT, 'host', 'bin', 'mrbc')
 MRUBY_BIN  = File.join(MRUBY_OUT, 'host', 'bin', 'mruby')
+RUBY_DIR   = File.join(ROOT, 'ruby')
+NATIVE_DIR = File.join(ROOT, 'native')
+STAGE      = File.join(BUILD, 'stage')                       # extra APK entries: lib/, assets/
+APP_MRB    = File.join(STAGE, 'assets', 'app.mrb')
+SO_DIR     = File.join(STAGE, 'lib', 'arm64-v8a')
+SO_OUT     = File.join(SO_DIR, 'libinspect.so')
+SO_UNSTRIPPED = File.join(BUILD, 'libinspect.unstripped.so')
+ALLOWED_NEEDED = %w[libc.so libm.so libdl.so liblog.so]
 
 def sh(*cmd, quiet: false)
   puts "→ #{cmd.join(' ')[0, 160]}" unless quiet
@@ -43,7 +51,7 @@ def newer?(srcs, target)
 end
 
 def check_tools
-  %w[aapt2 javac d8 apksigner zip].each { |t| abort "missing tool: #{t} (pkg install #{t})" unless system("command -v #{t} >/dev/null") }
+  %w[aapt2 javac d8 apksigner zip clang patchelf llvm-strip llvm-nm readelf].each { |t| abort "missing tool: #{t} (pkg install #{t})" unless system("command -v #{t} >/dev/null") }
   abort "missing #{JAR} — download platform zip into tools/" unless File.exist?(JAR)
   abort "missing #{KS} — run keytool (see PLAN.md)" unless File.exist?(KS)
 end
@@ -88,6 +96,59 @@ def mruby
   puts "✓ built #{MRUBY_LIB} (#{(File.size(MRUBY_LIB) / 1024).round} KB), #{MRBC}, #{MRUBY_BIN}"
 end
 
+# ruby/**/*.rb (in load_order.txt order) -> assets/app.mrb. Depends on mrbc (bytecode format).
+def mrb
+  mruby
+  order = File.read(File.join(RUBY_DIR, 'load_order.txt')).split.map { |f| File.join(RUBY_DIR, f) }
+  order.each { |f| abort "missing #{f} (listed in load_order.txt)" unless File.exist?(f) }
+  if File.exist?(APP_MRB) && !newer?(order + [MRBC], APP_MRB)
+    puts '✓ app.mrb up to date'
+    return
+  end
+  FileUtils.mkdir_p(File.dirname(APP_MRB))
+  sh(MRBC, '-g', '-o', APP_MRB, *order)
+  puts "✓ #{APP_MRB} (#{File.size(APP_MRB)} bytes)"
+end
+
+# native/*.c + libmruby.a -> lib/arm64-v8a/libinspect.so, then the loader gate.
+def native
+  mruby
+  srcs = Dir[File.join(NATIVE_DIR, '*.c')]
+  if File.exist?(SO_OUT) && !newer?(srcs + Dir[File.join(NATIVE_DIR, '*.h')] + [MRUBY_LIB], SO_OUT)
+    puts '✓ libinspect.so up to date'
+    return
+  end
+  FileUtils.mkdir_p(SO_DIR)
+  sh('clang', '-shared', '-fPIC', '-O2', '-g', '-std=gnu11', '-fvisibility=hidden',
+     '-ffunction-sections', '-fdata-sections', '-Wall',
+     '-DMRB_UTF8_STRING', '-DMRB_INT64', '-DMRB_USE_DEBUG_HOOK', '-DMRB_DEBUG',
+     '-I', File.join(MRUBY_SRC, 'include'), '-I', File.join(MRUBY_OUT, 'host', 'include'),
+     '-Wl,-soname,libinspect.so', '-Wl,-z,max-page-size=16384', '-Wl,--no-undefined', '-Wl,-z,defs',
+     '-Wl,--exclude-libs,ALL', '-Wl,--gc-sections',
+     '-o', SO_UNSTRIPPED, *srcs, MRUBY_LIB, '-llog', '-lm')
+  sh('patchelf', '--remove-rpath', SO_UNSTRIPPED)
+  sh('llvm-strip', '--strip-unneeded', '-o', SO_OUT, SO_UNSTRIPPED)
+  gate(SO_OUT)
+  puts "✓ #{SO_OUT} (#{(File.size(SO_OUT) / 1024).round} KB; unstripped kept for symbolizing)"
+end
+
+# Refuse to ship a library the Android loader would reject or that leaks Termux dependencies.
+def gate(so)
+  dyn = sh('readelf', '-d', so, quiet: true)
+  needed = dyn.scan(/\(NEEDED\)\s+Shared library: \[([^\]]+)\]/).flatten
+  bad = needed - ALLOWED_NEEDED
+  abort "✗ gate: unexpected NEEDED #{bad.inspect}" unless bad.empty?
+  abort '✗ gate: RUNPATH/RPATH present' if dyn =~ /\((RUNPATH|RPATH)\)/
+  abort '✗ gate: TEXTREL present' if dyn =~ /TEXTREL/
+  loads = sh('readelf', '-lW', so, quiet: true).lines.grep(/^\s*LOAD/)
+  aligns = loads.map { |l| l.split.last.hex }
+  abort "✗ gate: LOAD alignment #{aligns.inspect} < 0x4000" if aligns.any? { |a| a < 0x4000 }
+  exported = sh('llvm-nm', '-D', '--defined-only', so, quiet: true).lines.map { |l| l.split.last }
+  exported -= %w[edata etext end _edata _etext _end]   # linker-provided, harmless
+  abort "✗ gate: unexpected exports #{exported.inspect}" unless exported == ['JNI_OnLoad']
+  puts "✓ gate: NEEDED=#{needed.join(',')} align=0x#{aligns.min.to_s(16)} exports=JNI_OnLoad"
+end
+
 def build
   check_tools
   FileUtils.mkdir_p(BUILD)
@@ -130,11 +191,15 @@ def build
     puts '✓ dex up to date'
   end
 
+  mrb
+  native
   staged = File.join(BUILD, 'staged.apk')
   FileUtils.cp(unsigned, staged)
   Dir.chdir(dex_dir) { sh('zip', '-q', '-j', staged, 'classes.dex') }
   assets = File.join(ANDROID, 'assets')
   Dir.chdir(assets) { sh('zip', '-q', '-r', staged, '.', '-x', '.*') } if Dir.exist?(assets) && !Dir.empty?(assets)
+  # lib/arm64-v8a/libinspect.so + assets/app.mrb (extractNativeLibs=true, so compression is fine)
+  Dir.chdir(STAGE) { sh('zip', '-q', '-r', staged, 'lib', 'assets') }
   sh('apksigner', 'sign', '--ks', KS, '--ks-pass', 'pass:android', '--key-pass', 'pass:android',
      '--ks-key-alias', 'inspect', '--min-sdk-version', MIN_SDK.to_s, '--out', OUT_APK, staged)
   puts "✓ built #{OUT_APK} (#{(File.size(OUT_APK) / 1024.0).round} KB, sha1 #{Digest::SHA1.file(OUT_APK).hexdigest[0, 12]})"
@@ -153,9 +218,11 @@ end
 case ARGV[0] || 'build'
 when 'fetch'   then fetch
 when 'mruby'   then mruby
+when 'mrb'     then mrb
+when 'native'  then native
 when 'build'   then build
 when 'install' then build; install
 when 'run'     then run
-when 'clean'   then FileUtils.rm_rf(BUILD); puts 'cleaned'
-else abort 'usage: bin/build.rb [fetch|mruby|build|install|run|clean]'
+when 'clean'   then Dir[File.join(BUILD, '*')].each { |f| FileUtils.rm_rf(f) unless File.basename(f) == 'mruby' }; puts 'cleaned (kept build/mruby)'
+else abort 'usage: bin/build.rb [fetch|mruby|mrb|native|build|install|run|clean]'
 end

@@ -50,6 +50,7 @@
         <Button android:id="@+id/btn_newtab" style="@style/ToolBtn" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="+" />
         <Button android:id="@+id/btn_ua" style="@style/ToolBtn" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="🖥" />
         <Button android:id="@+id/btn_dock" style="@style/ToolBtn" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="⇲" />
+        <Button android:id="@+id/btn_ruby" style="@style/ToolBtn" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Rb" android:textColor="#f472b6" />
         <Button android:id="@+id/btn_devtools" style="@style/ToolBtn" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="⚙ DevTools" android:textColor="#38bdf8" />
     </LinearLayout>
 
@@ -101,5 +102,54 @@
             android:layout_height="match_parent"
             android:layout_weight="0"
             android:visibility="gone" />
+    </LinearLayout>
+
+    <!-- Ruby log + console pane (toggle with the Rb button). Our debugging window without logcat. -->
+    <LinearLayout
+        android:id="@+id/ruby_pane"
+        android:layout_width="match_parent"
+        android:layout_height="220dp"
+        android:orientation="vertical"
+        android:background="#020617"
+        android:visibility="gone">
+        <ScrollView
+            android:id="@+id/ruby_log_scroll"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1">
+            <TextView
+                android:id="@+id/ruby_log"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="#a5b4fc"
+                android:textSize="11sp"
+                android:typeface="monospace"
+                android:padding="8dp"
+                android:textIsSelectable="true" />
+        </ScrollView>
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="40dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:background="#0b1220">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="rb›" android:textColor="#f472b6" android:paddingLeft="8dp" android:typeface="monospace" />
+            <EditText
+                android:id="@+id/ruby_input"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="match_parent"
+                android:background="@null"
+                android:textColor="#e2e8f0"
+                android:textSize="13sp"
+                android:typeface="monospace"
+                android:hint="Ruby expression, e.g. Inspect.version"
+                android:textColorHint="#475569"
+                android:inputType="text"
+                android:imeOptions="actionSend"
+                android:singleLine="true"
+                android:paddingLeft="6dp" />
+            <Button android:id="@+id/btn_ruby_clear" style="@style/ToolBtn" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="clear" android:textSize="12sp" />
+        </LinearLayout>
     </LinearLayout>
 </LinearLayout>

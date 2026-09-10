@@ -41,7 +41,7 @@ import java.util.List;
  * A small tabbed browser whose pages can be inspected with the real Chrome DevTools
  * frontend, attached in-process through {@link DevToolsBridge}.
  */
-public class MainActivity extends Activity {
+public class MainActivity extends Activity implements RubyRuntime.Listener {
     private static final String TAG = "Inspect";
     private static final String DESKTOP_UA =
             "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36";
@@ -60,6 +60,11 @@ public class MainActivity extends Activity {
     private FrameLayout devtoolsContainer;
     private Button btnDevtools, btnDock, btnUa;
     private TextView statusView;
+    private View rubyPane;
+    private TextView rubyLog;
+    private android.widget.ScrollView rubyLogScroll;
+    private EditText rubyInput;
+    private final RubyRuntime ruby = RubyRuntime.get();
 
     private DevToolsBridge bridge;
     private DevToolsClient client;
@@ -94,6 +99,27 @@ public class MainActivity extends Activity {
         btnUa = findViewById(R.id.btn_ua);
         statusView = findViewById(R.id.status);
         statusView.setOnLongClickListener(v -> { statusView.setVisibility(View.GONE); return true; });
+        rubyPane = findViewById(R.id.ruby_pane);
+        rubyLog = findViewById(R.id.ruby_log);
+        rubyLogScroll = findViewById(R.id.ruby_log_scroll);
+        rubyInput = findViewById(R.id.ruby_input);
+        findViewById(R.id.btn_ruby).setOnClickListener(v -> toggleRubyPane());
+        findViewById(R.id.btn_ruby_clear).setOnClickListener(v -> rubyLog.setText(""));
+        rubyInput.setOnEditorActionListener((v, actionId, event) -> {
+            boolean send = actionId == EditorInfo.IME_ACTION_SEND
+                    || (event != null && event.getKeyCode() == KeyEvent.KEYCODE_ENTER && event.getAction() == KeyEvent.ACTION_DOWN);
+            if (!send) return false;
+            String src = rubyInput.getText().toString().trim();
+            if (src.isEmpty()) return true;
+            appendRubyLog("rb› " + src);
+            ruby.event("console.eval", "src", src);
+            rubyInput.setText("");
+            return true;
+        });
+
+        // Boot the Ruby brain (process-wide; survives Activity recreation).
+        ruby.start(this);
+        ruby.setListener(this);
 
         // The whole point: turn on WebView's DevTools server for this process.
         WebView.setWebContentsDebuggingEnabled(true);
@@ -409,6 +435,39 @@ public class MainActivity extends Activity {
 
     private void toast(String s) { Toast.makeText(this, s, Toast.LENGTH_SHORT).show(); }
 
+    // ---------------------------------------------------------------- ruby
+
+    private void toggleRubyPane() {
+        boolean show = rubyPane.getVisibility() != View.VISIBLE;
+        rubyPane.setVisibility(show ? View.VISIBLE : View.GONE);
+        if (show) { rubyLog.setText(ruby.logText()); scrollRubyLog(); }
+    }
+
+    private void appendRubyLog(String line) {
+        rubyLog.append(line + "\n");
+        scrollRubyLog();
+    }
+
+    private void scrollRubyLog() { rubyLogScroll.post(() -> rubyLogScroll.fullScroll(View.FOCUS_DOWN)); }
+
+    /** Commands from Ruby, delivered on the main thread. Phase 1: toast/log/console/ready/fatal. */
+    @Override
+    public void onRubyCommand(JSONObject cmd) {
+        String c = cmd.optString("cmd");
+        switch (c) {
+            case "toast": toast(cmd.optString("text")); break;
+            case "log": appendRubyLog("[" + cmd.optString("level") + "] " + cmd.optString("text")); break;
+            case "console.result": appendRubyLog("=> " + cmd.optString("text")); break;
+            case "ready": status("Ruby " + cmd.optString("ruby") + " ready (app " + cmd.optString("app") + ")"); break;
+            case "fatal":
+                status("RUBY FATAL: " + cmd.optString("text"));
+                appendRubyLog("[FATAL] " + cmd.optString("text"));
+                if (rubyPane.getVisibility() != View.VISIBLE) toggleRubyPane();
+                break;
+            default: appendRubyLog("? unknown command " + cmd); break;
+        }
+    }
+
     /** Diagnostics line under the toolbar (long-press to hide). We cannot read logcat from Termux. */
     private void status(String s) {
         Log.i(TAG, s);
@@ -425,6 +484,7 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        ruby.setListener(null);
         if (bridge != null) bridge.stop();
         for (Tab t : tabs) t.view.destroy();
         if (devtoolsView != null) devtoolsView.destroy();
