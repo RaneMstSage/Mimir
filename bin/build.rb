@@ -46,7 +46,8 @@ CROSS      = !ON_TERMUX && !NDK.empty?            # PC with the Android NDK: cro
 if CROSS && !File.directory?(File.join(NDK, 'toolchains'))
   abort "ANDROID_NDK_HOME=#{NDK} is not an NDK directory (no toolchains/ inside). Install 'NDK (Side by side)' in Android Studio's SDK Manager, then point ANDROID_NDK_HOME at e.g. ~/Android/Sdk/ndk/<version>."
 end
-if !ON_TERMUX && NDK.empty? && !(ARGV.reject { |a| a.start_with?('--') } - %w[test opal mrb fetch]).empty? == false
+needs_native = !(ARGV.reject { |a| a.start_with?('--') } - %w[test opal mrb fetch]).empty?
+if !ON_TERMUX && NDK.empty? && needs_native
   abort 'On a PC the Android NDK is required (the native library must target Android arm64): install "NDK (Side by side)" in the SDK Manager, or set ANDROID_NDK_HOME.'
 end
 MRUBY_LIB  = File.join(MRUBY_OUT, CROSS ? 'android-arm64' : 'host', 'lib', 'libmruby.a')

@@ -79,10 +79,18 @@ android {
 // Ruby-side stages (bytecode, native library, Opal UI) run before every Gradle build so an IDE
 // "Run" packages current artifacts. Each stage is incremental and returns quickly when nothing changed.
 // Skipped when bin/build.rb itself invoked Gradle (it has already run them).
+def sdkDirForRuby() {
+    def lp = file("${rootDir}/local.properties")
+    if (lp.exists()) {
+        def props = new Properties(); lp.withInputStream { props.load(it) }
+        if (props['sdk.dir']) return props['sdk.dir']
+    }
+    return System.getenv('ANDROID_HOME') ?: System.getenv('ANDROID_SDK_ROOT') ?: ''
+}
 tasks.register('rubyStages', Exec) {
     workingDir rootDir
     commandLine 'ruby', "${rootDir}/bin/build.rb", 'mrb', 'native', 'opal'
-    environment 'ANDROID_HOME', android.sdkDirectory.absolutePath      // lets build.rb find ndk/<version> without shell exports
+    environment 'ANDROID_HOME', sdkDirForRuby()        // lets build.rb find ndk/<version> without shell exports
     onlyIf { System.getenv('MIMIR_FROM_BUILD_RB') == null }
 }
 tasks.matching { it.name == 'preBuild' }.configureEach { dependsOn 'rubyStages' }
