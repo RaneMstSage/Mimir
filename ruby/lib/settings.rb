@@ -1,6 +1,6 @@
 # Persisted user preferences: files_dir/settings.json (written on every change; tiny).
 class Settings
-  DEFAULTS = { "desktop_ua" => true, "dock_side" => "right", "dock_fraction" => 0.45, "home" => "https://www.google.com/" }
+  DEFAULTS = { "desktop_ua" => true, "dock_side" => "right", "dock_fraction" => 0.45, "home" => "https://www.google.com/", "bookmarks_bar" => true }
 
   def initialize(dir)
     @path = dir ? "#{dir}/settings.json" : nil

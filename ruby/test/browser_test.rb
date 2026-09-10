@@ -64,3 +64,28 @@ test "Browser: devtools toggle docks and attaches current url; ua toggle reloads
   assert Inspect.emitted.any? { |c| c["cmd"] == "ua.set" && c["desktop"] == false }
   assert Inspect.emitted.any? { |c| c["cmd"] == "tab.reload" }
 end
+
+test "Bookmarks: toggle, history visit dedupes and caps" do
+  bm = Bookmarks.new(nil)
+  assert_equal true, bm.toggle("https://a.test/", "A")
+  assert_equal false, bm.toggle("https://a.test/", "A")
+  bm.visit("https://h.test/1", "one"); bm.visit("https://h.test/2", "two"); bm.visit("https://h.test/1", "one again")
+  assert_equal ["https://h.test/1", "https://h.test/2"], bm.history.map { |h| h["url"] }
+  bm.visit("about:blank", "x")
+  assert_equal 2, bm.history.size
+end
+
+test "Browser: state carries bookmarks, history and bar flag; find_target skips the chrome UI" do
+  bm = Bookmarks.new(nil)
+  br = Browser.new(Settings.new(nil), bm)
+  br.new_tab("https://s.test/")
+  br.page_title(1, "S")
+  br.page_finished(1, "https://s.test/", true, false)
+  st = Inspect.emitted.last["state"]
+  assert_equal true, st["can_back"]
+  assert_equal "https://s.test/", st["history"][0]["url"]
+  assert_equal true, st["bookmarks_bar"]
+  list = [{ "type" => "page", "id" => "c", "url" => "file:///android_asset/ui/ui.html", "description" => '{"visible":true}' },
+          { "type" => "page", "id" => "p", "url" => "https://s.test/", "description" => '{"visible":true}' }]
+  assert_equal "p", DevTools.find_target(list, "https://zzz/")["id"]
+end

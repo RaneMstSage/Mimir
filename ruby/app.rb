@@ -3,7 +3,7 @@
 # App.run(boot_json) never returns until a "quit" event arrives. It owns the single event loop:
 # IO.select over the native wake pipe (Java -> Ruby events) plus the DevTools relay sockets.
 module App
-  VERSION = "0.4.0"
+  VERSION = "0.5.0"
 
   @handlers = {}
   @running = false
@@ -21,7 +21,8 @@ module App
     Host.log(:info, "Ruby #{Inspect.version} up in pid #{Inspect.pid}; app #{VERSION}")
     Host.emit("ready", "ruby" => Inspect.version, "app" => VERSION)
     @settings = Settings.new(@boot["files_dir"])
-    @browser = Browser.new(@settings)
+    @bookmarks = Bookmarks.new(@boot["files_dir"])
+    @browser = Browser.new(@settings, @bookmarks)
     start_relay
 
     while @running
@@ -149,7 +150,15 @@ App.on("nav.back")      { |ev| b.call.nav(ev["tab"], "back") }
 App.on("nav.forward")   { |ev| b.call.nav(ev["tab"], "forward") }
 App.on("nav.reload")    { |ev| b.call.nav(ev["tab"], "reload") }
 App.on("page.started")  { |ev| b.call.page_started(ev["tab"], ev["url"]) }
-App.on("page.finished") { |ev| b.call.page_finished(ev["tab"], ev["url"]) }
+App.on("page.finished") { |ev| b.call.page_finished(ev["tab"], ev["url"], ev["can_back"], ev["can_forward"]) }
+App.on("page.favicon")  { |ev| b.call.page_favicon(ev["tab"], ev["data"]) }
+App.on("nav.stop")      { |ev| b.call.nav(ev["tab"], "stop") }
+App.on("bookmark.toggle") { |_| b.call.toggle_bookmark }
+App.on("bookmarks.bar")   { |_| b.call.toggle_bookmarks_bar }
+App.on("chrome.ready")  { |_| b.call.push_state }
+App.on("dev.toggle")    { |_| Host.emit("dev.toggle") }
+App.on("settings.open") { |_| Host.toast("Settings arrive in the next phase") }
+App.on("about")         { |_| Host.toast("Inspect Element #{App::VERSION} — mruby #{Inspect.version}") }
 App.on("page.title")    { |ev| b.call.page_title(ev["tab"], ev["title"]) }
 App.on("page.progress") { |ev| b.call.page_progress(ev["tab"], ev["p"]) }
 App.on("devtools.toggle")   { |_| b.call.toggle_devtools }

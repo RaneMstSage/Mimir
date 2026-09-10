@@ -13,13 +13,15 @@ module DevTools
   # Pick the page target for `url`. WebView's entries carry a "description" JSON with
   # visible/attached flags; prefer an exact URL match, then visible, then unattached.
   # `exclude_prefix` filters out the DevTools frontend WebView itself.
-  def self.find_target(list, url, exclude_prefix = CDN)
+  EXCLUDE = [CDN, "file:///android_asset/"]   # the DevTools frontend and our own chrome UI
+
+  def self.find_target(list, url, exclude_prefix = EXCLUDE)
     best = nil
     best_score = -1
     list.each do |t|
       next unless t["type"] == "page"
       u = t["url"].to_s
-      next if exclude_prefix && u.start_with?(exclude_prefix)
+      next if exclude_prefix && Array(exclude_prefix).any? { |p| u.start_with?(p) }
       score = 0
       score += 4 if url && url == u
       desc = (JSON.parse(t["description"].to_s) rescue {})

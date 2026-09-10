@@ -28,6 +28,8 @@ MRUBY_BIN  = File.join(MRUBY_OUT, 'host', 'bin', 'mruby')
 RUBY_DIR   = File.join(ROOT, 'ruby')
 NATIVE_DIR = File.join(ROOT, 'native')
 STAGE      = File.join(BUILD, 'stage')                       # extra APK entries: lib/, assets/
+UI_DIR     = File.join(ROOT, 'ui')
+UI_OUT     = File.join(STAGE, 'assets', 'ui')
 APP_MRB    = File.join(STAGE, 'assets', 'app.mrb')
 SO_DIR     = File.join(STAGE, 'lib', 'arm64-v8a')
 SO_OUT     = File.join(SO_DIR, 'libinspect.so')
@@ -166,6 +168,30 @@ def test
   abort '✗ tests failed' unless st.success?
 end
 
+# ui/ui.rb (Opal Ruby) -> assets/ui/ui.js, plus the static html/css. One bundle including the
+# Opal runtime; rebuilt only when ui/ changes.
+def opal
+  srcs = Dir[File.join(UI_DIR, '*')]
+  out_js = File.join(UI_OUT, 'ui.js')
+  if File.exist?(out_js) && !newer?(srcs, out_js)
+    puts '✓ ui.js up to date'
+    return
+  end
+  abort 'missing opal (gem install opal)' unless system('command -v opal >/dev/null')
+  FileUtils.mkdir_p(UI_OUT)
+  js, err, st = Open3.capture3('opal', '-c', '--no-source-map', '-I', UI_DIR, File.join(UI_DIR, 'ui.rb'))
+  unless st.success?
+    puts err
+    abort '✗ opal compile failed'
+  end
+  puts err.lines.grep_v(/backtick_javascript/).join unless err.strip.empty?
+  File.write(out_js, js)
+  out, st2 = Open3.capture2e('node', '--check', out_js)
+  abort "✗ ui.js is not valid JavaScript:\n#{out}" unless st2.success?
+  %w[ui.html ui.css].each { |f| FileUtils.cp(File.join(UI_DIR, f), UI_OUT) }
+  puts "✓ #{out_js} (#{(File.size(out_js) / 1024).round} KB incl. Opal runtime)"
+end
+
 def build
   check_tools
   FileUtils.mkdir_p(BUILD)
@@ -210,6 +236,7 @@ def build
 
   mrb
   native
+  opal
   staged = File.join(BUILD, 'staged.apk')
   FileUtils.cp(unsigned, staged)
   Dir.chdir(dex_dir) { sh('zip', '-q', '-j', staged, 'classes.dex') }
@@ -243,9 +270,10 @@ when 'mruby'   then mruby
 when 'mrb'     then mrb
 when 'native'  then native
 when 'test'    then test
+when 'opal'    then opal
 when 'build'   then build
 when 'install' then build; install
 when 'run'     then run
 when 'clean'   then Dir[File.join(BUILD, '*')].each { |f| FileUtils.rm_rf(f) unless File.basename(f) == 'mruby' }; puts 'cleaned (kept build/mruby)'
-else abort 'usage: bin/build.rb [fetch|mruby|mrb|native|test|build|install|run|clean]'
+else abort 'usage: bin/build.rb [fetch|mruby|mrb|native|opal|test|build|install|run|clean]'
 end

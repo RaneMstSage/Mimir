@@ -56,18 +56,15 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
     private final Handler main = new Handler(Looper.getMainLooper());
     private final RubyRuntime ruby = RubyRuntime.get();
     private final Map<Integer, WebView> tabs = new HashMap<>();
-    private final Map<Integer, TextView> chips = new HashMap<>();
     private int currentTab = -1;
 
-    private LinearLayout tabStrip;
-    private HorizontalScrollView tabScroll;
-    private EditText urlBar;
-    private ProgressBar progress;
+    private WebView chrome;                 // the Opal-rendered browser chrome (ui/)
+    private boolean chromeReady = false;
+    private String pendingState = null;
     private LinearLayout split;
     private FrameLayout pages;
     private View divider;
     private FrameLayout devtoolsContainer;
-    private Button btnDevtools, btnDock, btnUa;
     private TextView statusView;
     private View rubyPane;
     private TextView rubyLog;
@@ -89,49 +86,23 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.main);
 
-        tabStrip = findViewById(R.id.tab_strip);
-        tabScroll = findViewById(R.id.tab_scroll);
-        urlBar = findViewById(R.id.url);
-        progress = findViewById(R.id.progress);
+        chrome = findViewById(R.id.chrome);
         split = findViewById(R.id.split);
         pages = findViewById(R.id.pages);
         divider = findViewById(R.id.divider);
         devtoolsContainer = findViewById(R.id.devtools_container);
-        btnDevtools = findViewById(R.id.btn_devtools);
-        btnDock = findViewById(R.id.btn_dock);
-        btnUa = findViewById(R.id.btn_ua);
         statusView = findViewById(R.id.status);
         statusView.setOnLongClickListener(v -> { statusView.setVisibility(View.GONE); return true; });
         rubyPane = findViewById(R.id.ruby_pane);
         rubyLog = findViewById(R.id.ruby_log);
         rubyLogScroll = findViewById(R.id.ruby_log_scroll);
         rubyInput = findViewById(R.id.ruby_input);
+        findViewById(R.id.btn_ruby_clear).setOnClickListener(v -> rubyLog.setText(""));
 
         // Enable WebView's DevTools server for this process; Ruby's relay fronts it.
         WebView.setWebContentsDebuggingEnabled(true);
+        setupChrome();
 
-        // Toolbar -> events. No logic here.
-        findViewById(R.id.btn_back).setOnClickListener(v -> ruby.event("nav.back", "tab", currentTab));
-        findViewById(R.id.btn_fwd).setOnClickListener(v -> ruby.event("nav.forward", "tab", currentTab));
-        findViewById(R.id.btn_reload).setOnClickListener(v -> ruby.event("nav.reload", "tab", currentTab));
-        findViewById(R.id.btn_newtab).setOnClickListener(v -> ruby.event("tab.new"));
-        btnDevtools.setOnClickListener(v -> ruby.event("devtools.toggle"));
-        btnDevtools.setOnLongClickListener(v -> { ruby.event("devtools.list"); ruby.event("devtools.reattach"); return true; });
-        btnDock.setOnClickListener(v -> ruby.event("dock.toggle"));
-        btnUa.setOnClickListener(v -> ruby.event("ua.toggle"));
-        findViewById(R.id.btn_ruby).setOnClickListener(v -> toggleRubyPane());
-        findViewById(R.id.btn_ruby_clear).setOnClickListener(v -> rubyLog.setText(""));
-
-        urlBar.setOnEditorActionListener((v, actionId, event) -> {
-            boolean go = actionId == EditorInfo.IME_ACTION_GO
-                    || (event != null && event.getKeyCode() == KeyEvent.KEYCODE_ENTER && event.getAction() == KeyEvent.ACTION_DOWN);
-            if (!go) return false;
-            ruby.event("navigate", "tab", currentTab, "text", urlBar.getText().toString());
-            hideKeyboard();
-            WebView w = tabs.get(currentTab);
-            if (w != null) w.requestFocus();
-            return true;
-        });
         rubyInput.setOnEditorActionListener((v, actionId, event) -> {
             boolean send = actionId == EditorInfo.IME_ACTION_SEND
                     || (event != null && event.getKeyCode() == KeyEvent.KEYCODE_ENTER && event.getAction() == KeyEvent.ACTION_DOWN);
@@ -196,6 +167,7 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
         if (fallbackBridge != null) fallbackBridge.stop();
         for (WebView w : tabs.values()) w.destroy();
         if (devtoolsView != null) devtoolsView.destroy();
+        chrome.destroy();
         super.onDestroy();
     }
 
@@ -215,6 +187,8 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
                 case "tab.reload": { WebView w = tabs.get(cmd.getInt("tab")); if (w != null) w.reload(); break; }
                 case "ua.set": setDesktopUa(cmd.optBoolean("desktop", true)); break;
                 case "ui.state": renderState(cmd.getJSONObject("state")); break;
+                case "tab.stop": { WebView w = tabs.get(cmd.getInt("tab")); if (w != null) w.stopLoading(); break; }
+                case "dev.toggle": toggleRubyPane(); break;
                 case "devtools.dock": openDevtools(cmd.optString("side", "right"), (float) cmd.optDouble("fraction", 0.45)); break;
                 case "devtools.open": {
                     String fe = cmd.optString("url");
@@ -247,6 +221,46 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
         }
     }
 
+    // ------------------------------------------------------------------ chrome (Opal UI)
+
+    private void setupChrome() {
+        WebSettings cs = chrome.getSettings();
+        cs.setJavaScriptEnabled(true);
+        cs.setDomStorageEnabled(true);
+        cs.setAllowFileAccess(true);           // file:///android_asset/ui/*
+        cs.setSupportZoom(false);
+        cs.setTextZoom(100);
+        chrome.setBackgroundColor(0xFF020617);
+        chrome.setOverScrollMode(View.OVER_SCROLL_NEVER);
+        chrome.setVerticalScrollBarEnabled(false);
+        chrome.addJavascriptInterface(new ChromeBridge(ruby, (ev, o) -> {
+            if ("chrome.height".equals(ev)) { main.post(() -> setChromeHeight(o.optInt("dp", 80))); return true; }
+            if ("chrome.ready".equals(ev)) { main.post(() -> { chromeReady = true; if (pendingState != null) pushState(pendingState); }); return false; }
+            return false;
+        }), "host");
+        chrome.setWebChromeClient(new WebChromeClient() {
+            @Override public boolean onConsoleMessage(ConsoleMessage m) {
+                if (m.messageLevel() == ConsoleMessage.MessageLevel.ERROR) appendRubyLog("[chrome-ui] " + m.message() + " (" + m.lineNumber() + ")");
+                return true;
+            }
+        });
+        chrome.setWebViewClient(new WebViewClient());
+        chrome.loadUrl("file:///android_asset/ui/ui.html");
+    }
+
+    private void setChromeHeight(int dp) {
+        ViewGroup.LayoutParams lp = chrome.getLayoutParams();
+        int px = dp(dp);
+        if (lp.height != px) { lp.height = px; chrome.setLayoutParams(lp); }
+    }
+
+    /** Hand Ruby's state snapshot to the Opal chrome. */
+    private void pushState(String stateJson) {
+        if (!chromeReady) { pendingState = stateJson; return; }
+        pendingState = null;
+        chrome.evaluateJavascript("window.UI && UI.receive(" + JSONObject.quote(stateJson) + ")", null);
+    }
+
     // ------------------------------------------------------------------ tabs (views only)
 
     private void createTab(final int id, String url) {
@@ -260,36 +274,17 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
         pages.addView(w);
         tabs.put(id, w);
 
-        TextView chip = new TextView(this);
-        chip.setSingleLine(true);
-        chip.setMaxWidth(dp(220));
-        chip.setMinWidth(dp(100));
-        chip.setPadding(dp(12), 0, dp(12), 0);
-        chip.setGravity(android.view.Gravity.CENTER_VERTICAL);
-        chip.setTextSize(13);
-        chip.setText("New tab");
-        chip.setOnClickListener(v -> ruby.event("tab.select", "tab", id));
-        chip.setOnLongClickListener(v -> { ruby.event("tab.close", "tab", id); return true; });
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT);
-        lp.setMargins(dp(2), dp(4), dp(2), 0);
-        tabStrip.addView(chip, lp);
-        chips.put(id, chip);
-
         if (url != null && !url.isEmpty()) w.loadUrl(url);
     }
 
     private void showTab(int id) {
         currentTab = id;
         for (Map.Entry<Integer, WebView> e : tabs.entrySet()) e.getValue().setVisibility(e.getKey() == id ? View.VISIBLE : View.GONE);
-        TextView chip = chips.get(id);
-        if (chip != null) tabScroll.post(() -> tabScroll.smoothScrollTo(chip.getLeft() - dp(40), 0));
     }
 
     private void destroyTab(int id) {
         WebView w = tabs.remove(id);
         if (w != null) { pages.removeView(w); w.destroy(); }
-        TextView chip = chips.remove(id);
-        if (chip != null) tabStrip.removeView(chip);
     }
 
     private void configure(WebView w) {
@@ -315,37 +310,18 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
         for (WebView w : tabs.values()) w.getSettings().setUserAgentString(desktop ? DESKTOP_UA : null);
     }
 
-    /** Render the Ruby-owned snapshot: chips, URL bar, progress, button labels. */
+    /** The chrome renders Ruby's snapshot; nothing native to update besides the pane state. */
     private void renderState(JSONObject st) {
-        JSONArray arr = st.optJSONArray("tabs");
-        int current = st.optInt("current", -1);
-        if (arr != null) {
-            for (int i = 0; i < arr.length(); i++) {
-                JSONObject t = arr.optJSONObject(i);
-                if (t == null) continue;
-                TextView chip = chips.get(t.optInt("id"));
-                if (chip == null) continue;
-                boolean on = t.optInt("id") == current;
-                chip.setText(t.optString("title"));
-                chip.setBackgroundColor(on ? 0xFF1e293b : 0xFF020617);
-                chip.setTextColor(on ? 0xFFe2e8f0 : 0xFF94a3b8);
-            }
-        }
-        if (!urlBar.hasFocus()) urlBar.setText(st.optString("url"));
-        boolean loading = st.optBoolean("loading");
-        progress.setVisibility(loading ? View.VISIBLE : View.GONE);
-        progress.setProgress(st.optInt("progress"));
-        boolean desktop = st.optBoolean("desktop", true);
-        btnUa.setText(desktop ? "Desktop ✓" : "Mobile ✓");
-        JSONObject dt = st.optJSONObject("devtools");
-        if (dt != null) btnDevtools.setTextColor(dt.optBoolean("open") ? 0xFF22c55e : 0xFF38bdf8);
+        pushState(st.toString());
     }
 
     private final class PageClient extends WebViewClient {
         private final int id;
         PageClient(int id) { this.id = id; }
         @Override public void onPageStarted(WebView view, String url, Bitmap favicon) { ruby.event("page.started", "tab", id, "url", url); }
-        @Override public void onPageFinished(WebView view, String url) { ruby.event("page.finished", "tab", id, "url", url); }
+        @Override public void onPageFinished(WebView view, String url) {
+            ruby.event("page.finished", "tab", id, "url", url, "can_back", view.canGoBack(), "can_forward", view.canGoForward());
+        }
         @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest req) {
             Uri u = req.getUrl();
             String s = u.getScheme();
@@ -360,6 +336,16 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
         PageChrome(int id) { this.id = id; }
         @Override public void onProgressChanged(WebView view, int p) { ruby.event("page.progress", "tab", id, "p", p); }
         @Override public void onReceivedTitle(WebView view, String title) { ruby.event("page.title", "tab", id, "title", title == null ? "" : title); }
+        @Override public void onReceivedIcon(WebView view, Bitmap icon) {
+            if (icon == null) return;
+            try {
+                Bitmap small = icon.getWidth() > 32 ? Bitmap.createScaledBitmap(icon, 32, 32, true) : icon;
+                java.io.ByteArrayOutputStream bos = new java.io.ByteArrayOutputStream();
+                small.compress(Bitmap.CompressFormat.PNG, 100, bos);
+                String data = "data:image/png;base64," + android.util.Base64.encodeToString(bos.toByteArray(), android.util.Base64.NO_WRAP);
+                ruby.event("page.favicon", "tab", id, "data", data);
+            } catch (Exception ignored) {}
+        }
     }
 
     // ------------------------------------------------------------------ devtools pane (views only)
@@ -432,7 +418,6 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
 
     private void applyDock() {
         split.setOrientation(dockRight ? LinearLayout.HORIZONTAL : LinearLayout.VERTICAL);
-        btnDock.setText(dockRight ? "⇲" : "⇱");
         LinearLayout.LayoutParams pl, dl, vl;
         if (dockRight) {
             pl = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, devtoolsOpen ? 1f - devtoolsFraction : 1f);
@@ -472,7 +457,7 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
 
     private void hideKeyboard() {
         InputMethodManager imm = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
-        if (imm != null) imm.hideSoftInputFromWindow(urlBar.getWindowToken(), 0);
+        if (imm != null) imm.hideSoftInputFromWindow(chrome.getWindowToken(), 0);
     }
 
     // ------------------------------------------------------------------ diagnostics
