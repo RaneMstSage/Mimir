@@ -12,10 +12,10 @@ TOOLS   = File.join(ROOT, 'tools')
 BUILD   = File.join(ROOT, 'build')
 JAR     = File.join(TOOLS, 'android.jar')
 KS      = File.join(TOOLS, 'debug.keystore')
-PKG     = 'com.mstsage.inspect'
+PKG     = 'com.mstsage.mimir'
 MIN_SDK = 26
 TGT_SDK = 35
-OUT_APK = File.join(BUILD, 'InspectElement.apk')
+OUT_APK = File.join(BUILD, 'Mimir.apk')
 VENDOR     = File.join(ROOT, 'vendor')
 MRUBY_SRC  = File.join(VENDOR, 'mruby')
 MRUBY_TAG  = '4.0.0'
@@ -32,8 +32,8 @@ UI_DIR     = File.join(ROOT, 'ui')
 UI_OUT     = File.join(STAGE, 'assets', 'ui')
 APP_MRB    = File.join(STAGE, 'assets', 'app.mrb')
 SO_DIR     = File.join(STAGE, 'lib', 'arm64-v8a')
-SO_OUT     = File.join(SO_DIR, 'libinspect.so')
-SO_UNSTRIPPED = File.join(BUILD, 'libinspect.unstripped.so')
+SO_OUT     = File.join(SO_DIR, 'libmimir.so')
+SO_UNSTRIPPED = File.join(BUILD, 'libmimir.unstripped.so')
 ALLOWED_NEEDED = %w[libc.so libm.so libdl.so liblog.so]
 
 def sh(*cmd, quiet: false)
@@ -112,12 +112,12 @@ def mrb
   puts "✓ #{APP_MRB} (#{File.size(APP_MRB)} bytes)"
 end
 
-# native/*.c + libmruby.a -> lib/arm64-v8a/libinspect.so, then the loader gate.
+# native/*.c + libmruby.a -> lib/arm64-v8a/libmimir.so, then the loader gate.
 def native
   mruby
   srcs = Dir[File.join(NATIVE_DIR, '*.c')]
   if File.exist?(SO_OUT) && !newer?(srcs + Dir[File.join(NATIVE_DIR, '*.h')] + [MRUBY_LIB], SO_OUT)
-    puts '✓ libinspect.so up to date'
+    puts '✓ libmimir.so up to date'
     return
   end
   FileUtils.mkdir_p(SO_DIR)
@@ -125,13 +125,13 @@ def native
      '-ffunction-sections', '-fdata-sections', '-Wall',
      '-DMRB_UTF8_STRING', '-DMRB_INT64', '-DMRB_USE_DEBUG_HOOK', '-DMRB_DEBUG',
      '-I', File.join(MRUBY_SRC, 'include'), '-I', File.join(MRUBY_OUT, 'host', 'include'),
-     '-Wl,-soname,libinspect.so', '-Wl,-z,max-page-size=16384', '-Wl,--no-undefined', '-Wl,-z,defs',
+     '-Wl,-soname,libmimir.so', '-Wl,-z,max-page-size=16384', '-Wl,--no-undefined', '-Wl,-z,defs',
      '-Wl,--exclude-libs,ALL', '-Wl,--gc-sections',
      '-o', SO_UNSTRIPPED, *srcs, MRUBY_LIB, '-llog', '-lm')
   sh('patchelf', '--remove-rpath', SO_UNSTRIPPED)
   tmp = SO_OUT + '.tmp'
   sh('llvm-strip', '--strip-unneeded', '-o', tmp, SO_UNSTRIPPED)
-  gate(tmp)                       # only a library that passes the gate becomes libinspect.so
+  gate(tmp)                       # only a library that passes the gate becomes libmimir.so
   FileUtils.mv(tmp, SO_OUT)
   puts "✓ #{SO_OUT} (#{(File.size(SO_OUT) / 1024).round} KB; unstripped kept for symbolizing)"
 end
@@ -251,7 +251,7 @@ def build
   Dir.chdir(dex_dir) { sh('zip', '-q', '-j', staged, 'classes.dex') }
   assets = File.join(ANDROID, 'assets')
   Dir.chdir(assets) { sh('zip', '-q', '-r', staged, '.', '-x', '.*') } if Dir.exist?(assets) && !Dir.empty?(assets)
-  # lib/arm64-v8a/libinspect.so + assets/app.mrb (extractNativeLibs=true, so compression is fine)
+  # lib/arm64-v8a/libmimir.so + assets/app.mrb (extractNativeLibs=true, so compression is fine)
   Dir.chdir(STAGE) { sh('zip', '-q', '-r', staged, 'lib', 'assets') }
   sh('apksigner', 'sign', '--ks', KS, '--ks-pass', 'pass:android', '--key-pass', 'pass:android',
      '--ks-key-alias', 'inspect', '--min-sdk-version', MIN_SDK.to_s, '--out', OUT_APK, staged)
@@ -264,7 +264,7 @@ def install
   abort 'no APK; run build first' unless File.exist?(OUT_APK)
   dl = File.join(Dir.home, 'storage', 'downloads')
   abort 'run termux-setup-storage first (no ~/storage/downloads)' unless Dir.exist?(dl)
-  FileUtils.cp(OUT_APK, File.join(dl, 'InspectElement.apk'))
+  FileUtils.cp(OUT_APK, File.join(dl, 'Mimir.apk'))
   system('am', 'start', '-a', 'android.intent.action.VIEW_DOWNLOADS', out: File::NULL, err: File::NULL)
   puts 'APK copied to Downloads/InspectElement.apk — tap it in the file manager to install.'
 end

@@ -1,4 +1,4 @@
-package com.mstsage.inspect;
+package com.mstsage.mimir;
 
 /** JNI surface of libinspect.so (see native/inspect.c). Methods are bound via RegisterNatives. */
 final class Native {
@@ -7,7 +7,7 @@ final class Native {
 
     static {
         try {
-            System.loadLibrary("inspect");
+            System.loadLibrary("mimir");
         } catch (Throwable t) {
             loadError = t;
         }

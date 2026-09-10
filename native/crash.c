@@ -34,7 +34,7 @@ static void on_signal(int sig, siginfo_t *info, void *uctx) {
   snprintf(buf, sizeof buf, "NATIVE CRASH: signal %d (%s) code %d addr %p in thread '%s'\n",
            sig, sig == SIGSEGV ? "SIGSEGV" : sig == SIGABRT ? "SIGABRT" : sig == SIGBUS ? "SIGBUS" : sig == SIGFPE ? "SIGFPE" : sig == SIGILL ? "SIGILL" : "?",
            info ? info->si_code : 0, info ? info->si_addr : NULL, tname);
-  __android_log_write(ANDROID_LOG_ERROR, "InspectCrash", buf);
+  __android_log_write(ANDROID_LOG_ERROR, "MimirCrash", buf);
   if (fd >= 0) {
     wr(fd, buf);
     void *frames[48]; bt_t bt = { frames, 48, 0 };

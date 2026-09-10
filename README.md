@@ -1,5 +1,7 @@
-# Inspect Element
+# Mímir
 
+
+**Mímir** (formerly Inspect Element) — named for the Norse sage whose head counsels Odin with hidden knowledge: a browser that shows what is under a page. Built for doing web work and The Odin Project coursework from a Galaxy Tab S10+ in DeX.
 A standalone Android developer-tools browser for the Galaxy Tab S10+ (DeX-friendly, no adb),
 developed entirely on the tablet in Termux. Ruby runs the app logic and DevTools relay inside the
 APK (mruby via JNI); the UI is Ruby compiled with Opal; Java is thin view glue. The DevTools pane

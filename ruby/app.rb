@@ -1,4 +1,4 @@
-# Inspect Element — Ruby side entry point (runs inside the APK on the dedicated ruby thread).
+# Mímir — Ruby side entry point (runs inside the APK on the dedicated ruby thread).
 #
 # App.run(boot_json) never returns until a "quit" event arrives. It owns the single event loop:
 # IO.select over the native wake pipe (Java -> Ruby events) plus the DevTools relay sockets.

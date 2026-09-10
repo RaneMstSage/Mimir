@@ -1,4 +1,4 @@
-# Inspect Element — Ruby-built Android DevTools browser (plan v4)
+# Mímir (formerly Inspect Element) — Ruby-built Android DevTools browser (plan v4)
 
 ## Context
 
@@ -37,7 +37,7 @@ The existing 33 KB Java APK implements exactly this and has never been launched 
 ## Target architecture ("Ruby brain, Java glue")
 
 ```
-android/src/com/mstsage/inspect/
+android/src/com/mstsage/mimir/
   MainActivity.java     views (page WebViews, devtools WebView, chrome WebView) + execute(json) command switch
   RubyRuntime.java      process singleton: ruby thread, post(json), onCommand(json) -> main Handler, log pane feed
   Native.java           System.loadLibrary("inspect"); static native run(byte[] mrb, String boot), post(String)

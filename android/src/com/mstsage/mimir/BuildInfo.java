@@ -1,4 +1,4 @@
-package com.mstsage.inspect;
+package com.mstsage.mimir;
 
 /** Version constants kept in sync with AndroidManifest.xml by bin/build.rb. */
 final class BuildInfo {

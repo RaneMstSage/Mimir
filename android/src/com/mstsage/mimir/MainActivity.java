@@ -1,4 +1,4 @@
-package com.mstsage.inspect;
+package com.mstsage.mimir;
 
 import android.app.Activity;
 import android.content.Intent;
@@ -123,14 +123,14 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
         setupDivider();
         applyDock();
 
-        String crash = InspectApp.takeLastCrash(this, InspectApp.CRASH_FILE);
-        String ncrash = InspectApp.takeLastCrash(this, InspectApp.NATIVE_CRASH_FILE);
+        String crash = MimirApp.takeLastCrash(this, MimirApp.CRASH_FILE);
+        String ncrash = MimirApp.takeLastCrash(this, MimirApp.NATIVE_CRASH_FILE);
         if (crash != null || ncrash != null) {
             appendRubyLog("=== previous run crashed (copy also in Downloads) ===");
             if (crash != null) appendRubyLog(crash);
             if (ncrash != null) appendRubyLog(ncrash);
             if (rubyPane.getVisibility() != View.VISIBLE) toggleRubyPane();
-            status("Previous run crashed — see Rb pane / Downloads/InspectElement-crash.txt");
+            status("Previous run crashed — see Rb pane / Downloads/Mimir-crash.txt");
         }
 
         ruby.setListener(this);
