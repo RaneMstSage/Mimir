@@ -35,11 +35,16 @@ android {
     }
 
     signingConfigs {
-        debug {
-            storeFile file("${rootDir}/tools/debug.keystore")
-            storePassword 'android'
-            keyAlias 'inspect'
-            keyPassword 'android'
+        // The tablet's debug key lives in tools/ (ignored by git) so debug builds there update in
+        // place. Anywhere else, fall back to Android's standard auto-generated debug keystore.
+        def localDebugKs = file("${rootDir}/tools/debug.keystore")
+        if (localDebugKs.exists()) {
+            debug {
+                storeFile localDebugKs
+                storePassword 'android'
+                keyAlias 'inspect'
+                keyPassword 'android'
+            }
         }
         if (releaseEnv['MIMIR_KEYSTORE_PASS']) {
             release {
