@@ -362,7 +362,7 @@ def gradle(task)
   args = [File.exist?(wrapper) ? wrapper : 'gradle', '--console=plain']         # wrapper pins Gradle 9.7.1 everywhere
   args << '-q' unless ENV['VERBOSE']
   args << "-Pandroid.aapt2FromMavenOverride=#{ENV['PREFIX']}/bin/aapt2" if ON_TERMUX   # AGP's aapt2 is x86; use Termux's
-  ok = system({ 'JAVA_TOOL_OPTIONS' => '-Dfile.encoding=UTF-8' }, *args, task, chdir: ROOT)
+  ok = system({ 'JAVA_TOOL_OPTIONS' => '-Dfile.encoding=UTF-8', 'MIMIR_FROM_BUILD_RB' => '1' }, *args, task, chdir: ROOT)
   abort '✗ gradle failed (rerun with VERBOSE=1 for the full log)' unless ok
   out = Dir[File.join(ROOT, 'app', 'build', 'outputs', '**', '*.{apk,aab}')].max_by { |f| File.mtime(f) }
   puts "✓ #{out} (#{(File.size(out) / 1024.0).round} KB)" if out
@@ -442,7 +442,14 @@ def run
   system('am', 'start', '-n', "#{PKG}/.MainActivity") || puts('could not launch; open the app manually')
 end
 
-case (ARGV.reject { |a| a.start_with?('--') }[0] || 'build')
+cmds = ARGV.reject { |a| a.start_with?('--') }
+cmds = ['build'] if cmds.empty?
+# several stage names may be given at once, e.g. `mrb native opal` (used by the Gradle rubyStages task)
+if cmds.size > 1 && cmds.all? { |c| %w[fetch mruby mrb native opal test].include?(c) }
+  cmds.each { |c| send(c) }
+  exit 0
+end
+case cmds[0]
 when 'fetch'   then fetch
 when 'mruby'   then mruby
 when 'mrb'     then mrb

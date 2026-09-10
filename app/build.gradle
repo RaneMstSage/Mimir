@@ -76,6 +76,16 @@ android {
     }
 }
 
+// Ruby-side stages (bytecode, native library, Opal UI) run before every Gradle build so an IDE
+// "Run" packages current artifacts. Each stage is incremental and returns quickly when nothing changed.
+// Skipped when bin/build.rb itself invoked Gradle (it has already run them).
+tasks.register('rubyStages', Exec) {
+    workingDir rootDir
+    commandLine 'ruby', "${rootDir}/bin/build.rb", 'mrb', 'native', 'opal'
+    onlyIf { System.getenv('MIMIR_FROM_BUILD_RB') == null }
+}
+tasks.matching { it.name == 'preBuild' }.configureEach { dependsOn 'rubyStages' }
+
 dependencies {
     implementation 'com.android.billingclient:billing:9.1.0'
     // Play flags the old androidx.fragment that Play Services drags in; pin a current one.
