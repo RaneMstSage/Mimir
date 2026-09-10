@@ -235,6 +235,13 @@ def gen_buildinfo
   JAVA
   out = File.join(ANDROID, 'src', 'com', 'mstsage', 'mimir', 'BuildInfo.java')
   File.write(out, src) unless File.exist?(out) && File.read(out) == src
+  # Stamp the manifest from the same config: versionName = version, versionCode = MMmmpp (e.g. 0.8.0 -> 800).
+  ver = (cfg['version'] || '0.0.0').to_s
+  code = ver.split('.').map(&:to_i).values_at(0, 1, 2).map { |x| x || 0 }.then { |a, b, c| a * 10_000 + b * 100 + c }
+  mf = File.join(ANDROID, 'AndroidManifest.xml')
+  m = File.read(mf)
+  m2 = m.sub(/android:versionCode="\d+"/, "android:versionCode=\"#{code}\"").sub(/android:versionName="[^"]*"/, "android:versionName=\"#{ver}\"")
+  File.write(mf, m2) if m2 != m
 end
 
 def release_creds
@@ -289,7 +296,16 @@ def bundle
   sh('java', '-jar', BUNDLETOOL, 'build-bundle', "--modules=#{File.join(BUILD, 'aab', 'base.zip')}", "--output=#{OUT_AAB}")
   sh('jarsigner', '-keystore', RELEASE_KS, '-storepass', pass, '-keypass', pass, '-sigalg', 'SHA256withRSA', '-digestalg', 'SHA-256', OUT_AAB, alias_, quiet: true)
   sh('java', '-jar', BUNDLETOOL, 'validate', "--bundle=#{OUT_AAB}", quiet: true)
-  puts "✓ Play bundle #{OUT_AAB} (#{(File.size(OUT_AAB) / 1024.0).round} KB) — upload in Play Console"
+  # Prove the bundle installs: derive a universal APK the way Play would (with our aapt2, the
+  # bundled one is x86 Linux) and verify its signature.
+  apks = File.join(BUILD, 'Mimir.apks')
+  FileUtils.rm_f(apks)
+  sh('java', '-jar', BUNDLETOOL, 'build-apks', "--bundle=#{OUT_AAB}", "--output=#{apks}", '--mode=universal',
+     "--aapt2=#{`command -v aapt2`.strip}", "--ks=#{RELEASE_KS}", "--ks-key-alias=#{alias_}", "--ks-pass=pass:#{pass}", "--key-pass=pass:#{pass}", quiet: true)
+  chk = File.join(BUILD, 'aab-check'); FileUtils.rm_rf(chk); FileUtils.mkdir_p(chk)
+  sh('unzip', '-q', '-o', apks, 'universal.apk', '-d', chk, quiet: true)
+  sh('apksigner', 'verify', File.join(chk, 'universal.apk'), quiet: true)
+  puts "✓ Play bundle #{OUT_AAB} (#{(File.size(OUT_AAB) / 1024.0).round} KB), universal APK from it verifies — upload the .aab in Play Console"
 end
 
 def build
