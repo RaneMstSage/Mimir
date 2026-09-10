@@ -47,13 +47,27 @@ module UI
     @page = nil
     @menu_open = false
     begin
-      `#{el("page")}.hidden = true; #{el("menu")}.hidden = true; #{el("suggest")}.hidden = true`
+      hide(el("page")) ; hide(el("menu")) ; hide(el("suggest")) ; hide(el("bmdrop")) ; hide(el("bmpop"))
       sync_height
     rescue Exception
     end
   end
 
   def self.el(id) ; `document.getElementById(#{id})` ; end
+
+  # NOTE: Opal prepends `return` to a method's last expression. A backtick block with several
+  # JavaScript statements as that last expression runs only its first statement. Never chain
+  # statements inside one backtick; use these helpers or separate backticks.
+  def self.show(elem, html)
+    `#{elem}.innerHTML = #{html}`
+    `#{elem}.hidden = false`
+    nil
+  end
+
+  def self.hide(elem)
+    `#{elem}.hidden = true`
+    nil
+  end
   def self.esc(s)
     s.to_s.gsub("&", "&amp;").gsub("<", "&lt;").gsub(">", "&gt;").gsub('"', "&quot;")
   end
@@ -114,7 +128,8 @@ module UI
 
   # Called by the host after it resizes the chrome WebView: force a layout/paint pass.
   def self.relayout
-    `document.body.getBoundingClientRect(); void document.body.offsetHeight`
+    `document.body.getBoundingClientRect()`
+    `void document.body.offsetHeight`
     nil
   end
 
@@ -186,9 +201,9 @@ module UI
       other = (b["other"] || {})["children"] || []
       html = items.empty? ? "<span class=\"empty\">No bookmarks yet — tap ☆ on a page</span>" : items.map { |x| bm_button(x) }.join
       html += "<span style=\"flex:1\"></span>" + bm_button(b["other"]) unless other.empty?
-      `#{bar}.innerHTML = #{html}; #{bar}.hidden = false`
+      show(bar, html)
     else
-      `#{bar}.hidden = true`
+      hide(bar)
     end
   end
 
@@ -214,7 +229,9 @@ module UI
       end
     end
     x = `(function(){ var b = document.querySelector('[data-act="bmfolder"][data-id="' + #{@bm_folder.to_s} + '"]'); return b ? Math.round(b.getBoundingClientRect().left) : 8; })()`
-    `#{d}.innerHTML = #{rows.join}; #{d}.style.left = Math.min(#{x}, window.innerWidth - 350) + 'px'; #{d}.style.top = '110px'; #{d}.hidden = false`
+    `#{d}.style.left = Math.min(#{x}, window.innerWidth - 350) + 'px'`
+    `#{d}.style.top = '110px'`
+    show(d, rows.join)
   end
 
   # Chrome-style "Bookmark added" popup: name + folder, Remove / Done.
@@ -230,7 +247,7 @@ module UI
            "<label>Folder</label><select id=\"bmpop-folder\">#{folder_options(parent)}</select>" \
            "<div class=\"acts\"><button class=\"btn\" data-act=\"bmpop.remove\" data-id=\"#{node["id"]}\">Remove</button>" \
            "<button class=\"btn\" style=\"background:var(--acc);color:#082f49\" data-act=\"bmpop.done\" data-id=\"#{node["id"]}\">Done</button></div>"
-    `#{p}.innerHTML = #{html}; #{p}.hidden = false`
+    show(p, html)
   end
 
   def self.render_menu
@@ -256,7 +273,7 @@ module UI
       ["page:about", "About Mímir", ""]
     ]
     html = rows.map { |r| r == :hr ? "<hr>" : "<button class=\"m\" data-act=\"#{r[0]}\"><span>#{r[1]}</span><small>#{r[2]}</small></button>" }.join
-    `#{m}.innerHTML = #{html}; #{m}.hidden = false`
+    show(m, html)
     sync_height
   end
 
@@ -270,7 +287,7 @@ module UI
     hits = pool.select { |e| e["url"].to_s.downcase.include?(q) || e["title"].to_s.downcase.include?(q) }.first(6)
     html = hits.map { |e| "<button class=\"s\" data-act=\"open\" data-url=\"#{esc(e["url"])}\"><span class=\"k\">#{e["k"]}</span><span>#{esc(e["title"].to_s[0, 40])}</span><span class=\"u\">#{esc(e["url"])}</span></button>" }.join
     html += "<button class=\"s\" data-act=\"navigate\" data-text=\"#{esc(q)}\"><span class=\"k\">🔍</span><span>Search for “#{esc(q)}”</span></button>"
-    `#{box}.innerHTML = #{html}; #{box}.hidden = false`
+    show(box, html)
     sync_height
   end
 
@@ -422,18 +439,7 @@ module UI
            end
     html = "<header><h1>#{title}</h1>#{search}<button class=\"ib\" data-act=\"page:close\" aria-label=\"Close\">✕</button></header>" \
            "<div class=\"body\">#{nav}<main>#{body}</main></div>"
-    `#{pg}.innerHTML = #{html}; #{pg}.hidden = false`
-    debug_page(pg)
-  end
-
-  # Temporary diagnostics: how the overlay actually ended up on screen.
-  def self.debug_page(pg)
-    info = `(function(el){ var r = el.getBoundingClientRect(), cs = getComputedStyle(el);
-      return 'page rect ' + Math.round(r.left) + ',' + Math.round(r.top) + ' ' + Math.round(r.width) + 'x' + Math.round(r.height) +
-        ' display=' + cs.display + ' pos=' + cs.position + ' bg=' + cs.backgroundColor + ' z=' + cs.zIndex + ' vis=' + cs.visibility + ' op=' + cs.opacity +
-        ' hidden=' + el.hidden + ' html=' + el.innerHTML.length + ' viewport ' + window.innerWidth + 'x' + window.innerHeight +
-        ' body ' + document.body.clientWidth + 'x' + document.body.clientHeight + ' dpr=' + window.devicePixelRatio; })(#{pg})`
-    `window.host && window.host.send(#{ { "ev" => "ui.debug", "text" => info }.to_json })`
+    show(pg, html)
   end
 
   def self.filter(q) ; @filter = q.to_s ; render_page ; end

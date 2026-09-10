@@ -37,6 +37,8 @@ try {
   console.log('bar folder dropdown:', !doc.getElementById('bmdrop').hidden && doc.getElementById('bmdrop').innerHTML.includes('w.test'));
   click(doc.querySelector('[data-act="bookmark.toggle"]'));
   console.log('star popup:', !doc.getElementById('bmpop').hidden && doc.getElementById('bmpop').innerHTML.includes('Bookmark added'));
+  const uiErrors = sent.filter(e => e.ev === 'ui.error');
+  if (uiErrors.length) { console.log('UI ERRORS:', JSON.stringify(uiErrors, null, 1)); errors.push('ui.error events: ' + uiErrors.map(e => e.text).join(' | ')); }
   click(doc.querySelector('[data-act="page:close"]')); click(doc.querySelector('[data-act="tab.new"]'));
   console.log('tab.new sent:', sent.some(s => s.ev === 'tab.new'));
 } catch (e) { errors.push('interact: ' + (e.stack || e)); }

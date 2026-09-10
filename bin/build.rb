@@ -179,6 +179,14 @@ def opal
     return
   end
   abort 'missing opal (gem install opal)' unless system('command -v opal >/dev/null')
+  # Lint: Opal returns a method's last expression; a backtick with several JS statements there
+  # silently runs only the first. Forbid multi-statement backticks outright.
+  File.readlines(File.join(UI_DIR, 'ui.rb')).each_with_index do |line, i|
+    next if line.strip.start_with?('#')
+    if line =~ /`[^`]*;[^`]*`/ && line !~ /%x\{/
+      abort "✗ ui/ui.rb:#{i + 1}: multi-statement backtick (Opal runs only the first when it is the last expression): #{line.strip[0, 90]}"
+    end
+  end
   FileUtils.mkdir_p(UI_OUT)
   js, err, st = Open3.capture3('opal', '-c', '--no-source-map', '-I', UI_DIR, File.join(UI_DIR, 'ui.rb'))
   unless st.success?
