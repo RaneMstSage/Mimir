@@ -25,13 +25,13 @@
 
 ### Phase 4 — Browser chrome in Ruby via Opal (large)
 Design target: what a modern desktop browser does, in a compact dark theme.
-- [ ] Toolchain: `bin/build.rb opal` compiles `ui/*.rb` → `android/assets/ui/` (runtime once, app bundle separately); Opal 1.8.3 verified.
-- [ ] Chrome WebView + `@JavascriptInterface host.send(json)` → Ruby events; `ui.state` → `UI.receive(json)`; filter the chrome WebView out of DevTools targets; IME/focus handling for the URL field.
-- [ ] Tab strip: favicon + title, **× close on each tab**, `+` new tab, active state, scroll, middle/long-press close, drag order (later).
-- [ ] Toolbar: back/forward/reload/stop, omnibox with search + suggestions from history/bookmarks, ★ bookmark toggle, Desktop/Mobile, DevTools, dock, ⋮ menu.
-- [ ] **Bookmarks**: star current page, bookmarks bar toggle, manager (rename/delete/folders), stored by Ruby in `bookmarks.json`.
-- [ ] History (recent pages) for omnibox suggestions; stored by Ruby.
-- [ ] Remove XML toolbar/tab strip; keep Rb pane as a developer drawer.
+- [x] Toolchain: `bin/build.rb opal` compiles `ui/ui.rb` → `assets/ui/ui.js` (782 KB single bundle, node-validated); Opal 1.8.3.
+- [x] Chrome WebView + `ChromeBridge.send(json)` → Ruby events (chrome.height handled locally); `ui.state` → `UI.receive(json)`; chrome excluded from DevTools targets; omnibox keeps focus while typing.
+- [~] Tab strip: favicon + title, × close, + new tab, active/loading state, scroll. (drag order later)
+- [~] Toolbar: back/forward/reload/stop, omnibox + suggestions (history/bookmarks), ★, Desktop/Mobile, DevTools, ⋮ menu (dock in menu). Needs on-device check.
+- [~] **Bookmarks**: star current page, bookmarks bar toggle, stored by Ruby in `bookmarks.json`. Manager (rename/delete/folders) pending.
+- [x] History (recent pages, 200) for omnibox suggestions; stored by Ruby.
+- [x] Removed XML toolbar/tab strip; Rb pane stays as a developer drawer (menu → Ruby console).
 
 ### Phase 5 — Settings, scripts, polish
 - [ ] **Settings page** (Ruby-owned, Opal-rendered): search engine, homepage, desktop mode default, JavaScript, cookies/3rd-party, force dark, text zoom, clear browsing data, DevTools defaults (dock side, theme, screencast).

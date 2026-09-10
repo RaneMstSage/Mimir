@@ -6,5 +6,6 @@ lib/devtools.rb
 lib/relay.rb
 lib/urlnorm.rb
 lib/settings.rb
+lib/bookmarks.rb
 lib/tabs.rb
 app.rb
