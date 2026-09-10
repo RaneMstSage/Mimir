@@ -3,7 +3,7 @@
 # App.run(boot_json) never returns until a "quit" event arrives. It owns the single event loop:
 # IO.select over the native wake pipe (Java -> Ruby events) plus the DevTools relay sockets.
 module App
-  VERSION = "0.5.0"
+  VERSION = "0.6.0"
 
   @handlers = {}
   @running = false
@@ -139,6 +139,7 @@ App.on("ui.ready") do |ev|
     b.call.select_tab(b.call.current.id) if b.call.current
   end
   Host.emit("ua.set", "desktop" => b.call.desktop?)
+  b.call.apply_prefs
   b.call.push_state
 end
 
@@ -157,8 +158,12 @@ App.on("bookmark.toggle") { |_| b.call.toggle_bookmark }
 App.on("bookmarks.bar")   { |_| b.call.toggle_bookmarks_bar }
 App.on("chrome.ready")  { |_| b.call.push_state }
 App.on("dev.toggle")    { |_| Host.emit("dev.toggle") }
-App.on("settings.open") { |_| Host.toast("Settings arrive in the next phase") }
-App.on("about")         { |_| Host.toast("Inspect Element #{App::VERSION} — mruby #{Inspect.version}") }
+App.on("settings.set")     { |ev| b.call.set_setting(ev["key"].to_s, ev["value"]) }
+App.on("data.clear")       { |ev| b.call.clear_data(ev["what"]) }
+App.on("history.remove")   { |ev| b.call.history_remove(ev["url"].to_s) }
+App.on("history.clear")    { |_|  b.call.clear_data(["history"]) }
+App.on("bookmark.remove")  { |ev| b.call.bookmark_remove(ev["url"].to_s) }
+App.on("bookmark.rename")  { |ev| b.call.bookmark_rename(ev["url"].to_s, ev["title"]) }
 App.on("page.title")    { |ev| b.call.page_title(ev["tab"], ev["title"]) }
 App.on("page.progress") { |ev| b.call.page_progress(ev["tab"], ev["p"]) }
 App.on("devtools.toggle")   { |_| b.call.toggle_devtools }

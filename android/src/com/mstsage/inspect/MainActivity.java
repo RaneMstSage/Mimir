@@ -77,6 +77,8 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
     private float devtoolsFraction = 0.45f;
     private boolean desktopUa = true;
     private int rubyRelayPort = -1;
+    private String devtoolsTheme = "dark";
+    private boolean devtoolsScreencast = false;
     private DevToolsBridge fallbackBridge;
 
     // ------------------------------------------------------------------ lifecycle
@@ -187,6 +189,9 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
                 case "tab.forward": { WebView w = tabs.get(cmd.getInt("tab")); if (w != null && w.canGoForward()) w.goForward(); break; }
                 case "tab.reload": { WebView w = tabs.get(cmd.getInt("tab")); if (w != null) w.reload(); break; }
                 case "ua.set": setDesktopUa(cmd.optBoolean("desktop", true)); break;
+                case "prefs.apply": applyPrefs(cmd); break;
+                case "devtools.prefs": devtoolsTheme = cmd.optString("theme", "dark"); devtoolsScreencast = cmd.optBoolean("screencast", false); break;
+                case "data.clear": clearData(cmd); break;
                 case "ui.state": renderState(cmd.getJSONObject("state")); break;
                 case "tab.stop": { WebView w = tabs.get(cmd.getInt("tab")); if (w != null) w.stopLoading(); break; }
                 case "dev.toggle": toggleRubyPane(); break;
@@ -251,8 +256,10 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
 
     private void setChromeHeight(int dp) {
         ViewGroup.LayoutParams lp = chrome.getLayoutParams();
-        int px = dp(dp);
+        int px = dp < 0 ? ViewGroup.LayoutParams.MATCH_PARENT : dp(dp);   // -1: overlay page fills the window
         if (lp.height != px) { lp.height = px; chrome.setLayoutParams(lp); }
+        boolean overlay = dp < 0;
+        split.setVisibility(overlay ? View.GONE : View.VISIBLE);
     }
 
     /** Hand Ruby's state snapshot to the Opal chrome. */
@@ -302,8 +309,35 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
         s.setMixedContentMode(WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE);
         s.setAllowFileAccess(false);
         if (desktopUa) s.setUserAgentString(DESKTOP_UA);
-        CookieManager.getInstance().setAcceptThirdPartyCookies(w, true);
         w.setBackgroundColor(Color.WHITE);
+        applyPrefs(w);
+    }
+
+    private JSONObject prefs = new JSONObject();
+
+    /** WebView preferences Ruby owns (Settings page): JS, third-party cookies, force dark, text zoom. */
+    private void applyPrefs(JSONObject p) {
+        prefs = p;
+        for (WebView w : tabs.values()) applyPrefs(w);
+    }
+
+    private void applyPrefs(WebView w) {
+        WebSettings s = w.getSettings();
+        s.setJavaScriptEnabled(prefs.optBoolean("javascript", true));
+        s.setTextZoom(prefs.optInt("text_zoom", 100));
+        CookieManager.getInstance().setAcceptThirdPartyCookies(w, prefs.optBoolean("cookies_3p", true));
+        boolean dark = prefs.optBoolean("force_dark", false);
+        if (android.os.Build.VERSION.SDK_INT >= 33) {
+            s.setAlgorithmicDarkeningAllowed(dark);
+        } else if (android.os.Build.VERSION.SDK_INT >= 29) {
+            s.setForceDark(dark ? WebSettings.FORCE_DARK_ON : WebSettings.FORCE_DARK_OFF);
+        }
+    }
+
+    private void clearData(JSONObject c) {
+        if (c.optBoolean("cookies")) { CookieManager.getInstance().removeAllCookies(null); CookieManager.getInstance().flush(); }
+        if (c.optBoolean("cache")) for (WebView w : tabs.values()) w.clearCache(true);
+        if (c.optBoolean("storage")) android.webkit.WebStorage.getInstance().deleteAllData();
     }
 
     private void setDesktopUa(boolean desktop) {
@@ -378,11 +412,11 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
                 @Override public void onPageFinished(WebView v, String u) {
                     if (!u.startsWith(DEVTOOLS_CDN)) return;
                     status("frontend loaded");
-                    // Persist DevTools prefs: no screencast preview (the page is right beside it), dark theme.
-                    v.evaluateJavascript("(function(){try{var r='ok';"
-                            + "if(localStorage.getItem('screencastEnabled')!=='false'){localStorage.setItem('screencastEnabled','false');r='reload';}"
-                            + "if(!localStorage.getItem('uiTheme')){localStorage.setItem('uiTheme','\"dark\"');r='reload';}"
-                            + "return r;}catch(e){return 'err:'+e;}})()", res -> { if (res != null && res.contains("reload")) v.reload(); });
+                    // Apply Ruby-owned DevTools prefs (theme, screencast) via the frontend's localStorage
+                    // settings store; reload once if anything changed.
+                    String want = "{screencastEnabled:'" + (devtoolsScreencast ? "true" : "false") + "',uiTheme:'\"" + devtoolsTheme + "\"'}";
+                    v.evaluateJavascript("(function(w){try{var r='ok';for(var k in w){if(localStorage.getItem(k)!==w[k]){localStorage.setItem(k,w[k]);r='reload';}}return r;}catch(e){return 'err:'+e;}})(" + want + ")",
+                            res -> { if (res != null && res.contains("reload")) v.reload(); });
                 }
             });
             devtoolsView.setWebChromeClient(new WebChromeClient() {

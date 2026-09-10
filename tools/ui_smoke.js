@@ -1,8 +1,9 @@
 // Minimal DOM stub to boot the Opal chrome bundle in Node and surface runtime errors.
 const els = {};
 function mk(id){ return { id, innerHTML:'', hidden:false, style:{}, dataset:{}, value:'', listeners:{}, addEventListener(t,f){ (this.listeners[t] ||= []).push(f); }, select(){}, blur(){}, focus(){}, closest(){ return null; } }; }
+global.document = global.document || {}; global.Date = Date;
 const docListeners = {};
-global.document = { activeElement:null, getElementById(id){ return els[id] ||= mk(id); }, addEventListener(t,f){ (docListeners[t] ||= []).push(f); }, };
+global.document = { activeElement:null, getElementById(id){ return els[id] ||= mk(id); }, addEventListener(t,f){ (docListeners[t] ||= []).push(f); }, querySelector(){ return null; }, querySelectorAll(){ return []; } };
 global.window = global; global.host = { send(j){ console.log('host.send', j.slice(0,120)); } };
 global.setTimeout = (f)=>f();
 try {
@@ -18,5 +19,10 @@ try {
   const ev = { target: btn, preventDefault(){}, stopPropagation(){} };
   (docListeners.click || []).forEach(f => f(ev));
   if (!sent.some(e => e.ev === 'tab.new')) throw new Error('tap on + did not emit tab.new; sent=' + JSON.stringify(sent));
-  console.log('ui smoke ok (render + tap)');
+  // open the Settings overlay through the menu action and check it rendered Chrome-style sections
+  const sbtn = { dataset: { act: 'page:settings' }, closest(sel){ return sel === '[data-act]' ? sbtn : null; } };
+  (docListeners.click || []).forEach(f => f({ target: sbtn, preventDefault(){}, stopPropagation(){} }));
+  if (!els.page.innerHTML.includes('Search engine') || !els.page.innerHTML.includes('<nav>')) throw new Error('settings page did not render: ' + els.page.innerHTML.slice(0, 200));
+  if (!sent.some(e => e.ev === 'chrome.height' && e.dp === -1)) throw new Error('overlay did not request full height');
+  console.log('ui smoke ok (render + tap + settings page)');
 } catch (e) { console.log('UI RUNTIME ERROR:', e && (e.stack || e)); process.exit(1); }
