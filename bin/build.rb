@@ -207,10 +207,15 @@ def build
   puts "✓ built #{OUT_APK} (#{(File.size(OUT_APK) / 1024.0).round} KB, sha1 #{Digest::SHA1.file(OUT_APK).hexdigest[0, 12]})"
 end
 
+# Android 14+ silently drops installer requests from apps without REQUEST_INSTALL_PACKAGES
+# (Termux), so we stage the APK in public Downloads and open the file manager there instead.
 def install
   abort 'no APK; run build first' unless File.exist?(OUT_APK)
-  sh('termux-open', '--content-type', 'application/vnd.android.package-archive', OUT_APK)
-  puts 'Installer opened — tap Install (or Update).'
+  dl = File.join(Dir.home, 'storage', 'downloads')
+  abort 'run termux-setup-storage first (no ~/storage/downloads)' unless Dir.exist?(dl)
+  FileUtils.cp(OUT_APK, File.join(dl, 'InspectElement.apk'))
+  system('am', 'start', '-a', 'android.intent.action.VIEW_DOWNLOADS', out: File::NULL, err: File::NULL)
+  puts 'APK copied to Downloads/InspectElement.apk — tap it in the file manager to install.'
 end
 
 def run
