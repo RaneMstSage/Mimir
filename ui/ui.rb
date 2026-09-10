@@ -55,7 +55,7 @@ module UI
         "<button class=\"x\" data-act=\"tab.close\" data-tab=\"#{t["id"]}\" aria-label=\"Close tab\">×</button>" \
       "</div>"
     end.join
-    html << "<button class=\"new\" data-act=\"tab.new\" aria-label=\"New tab\">+</button>"
+    html += "<button class=\"new\" data-act=\"tab.new\" aria-label=\"New tab\">+</button>"
     `#{el("tabs")}.innerHTML = #{html}`
   end
 
@@ -132,7 +132,7 @@ module UI
     pool = (@state["bookmarks"].map { |b| b.merge("k" => "★") } + @state["history"].map { |h| h.merge("k" => "⌚") })
     hits = pool.select { |e| e["url"].to_s.downcase.include?(q) || e["title"].to_s.downcase.include?(q) }.first(6)
     html = hits.map { |e| "<button class=\"s\" data-act=\"open\" data-url=\"#{esc(e["url"])}\"><span class=\"k\">#{e["k"]}</span><span>#{esc(e["title"].to_s[0, 40])}</span><span class=\"u\">#{esc(e["url"])}</span></button>" }.join
-    html << "<button class=\"s\" data-act=\"navigate\" data-text=\"#{esc(q)}\"><span class=\"k\">🔍</span><span>Search for “#{esc(q)}”</span></button>"
+    html += "<button class=\"s\" data-act=\"navigate\" data-text=\"#{esc(q)}\"><span class=\"k\">🔍</span><span>Search for “#{esc(q)}”</span></button>"
     `#{box}.innerHTML = #{html}; #{box}.hidden = false`
   end
 
