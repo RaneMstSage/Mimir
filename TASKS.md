@@ -48,7 +48,7 @@ Design target: what a modern desktop browser does, in a compact dark theme.
   - [x] Gradle 9.7 + AGP 9.4 assembleDebug succeeds on device (tools/sdk: platform-35 + build-tools 36 with Termux aapt2/d8; aapt placeholder)
   - [x] `Support` interface + Gradle-only `BillingSupport` (connect, queryProductDetails for tip_small/tip_medium/tip_large, launchBillingFlow, consume, leftover-purchase sweep); events to Ruby; R8 keep rules
   - [x] Ruby/Opal: Support page (tiers with Play prices, thank-you, Play-unavailable fallback with external Donate link); menu → Support Mímir ♥
-  - [ ] Play Console: create the three consumable in-app products tip_small/tip_medium/tip_large + license tester (user, after first bundle processed)
+  - [ ] Play Console → Monetize → One-time products: tip_small “Coffee” 4.99, tip_medium “Lunch” 14.99, tip_large “Dinner” 29.99 (consumable; images in store/tips/); Monetization setup → License testing (user)
 - [ ] Post-approval: upload 803 + symbols; test tip purchase on internal track; then production rollout. QA checklist: fresh install, settings/bookmarks/scripts persistence, DevTools attach, DeX resize, rotation, back button, external links, downloads (not yet handled), file chooser (not yet handled)
 
 ## Notes
