@@ -40,7 +40,7 @@ Design target: what a modern desktop browser does, in a compact dark theme.
 
 ## Phase 6 — Release
 - [x] Release keystore (`tools/release.keystore` + `tools/release.env`, ignored; RSA-4096, 30y, alias mimir) + `bin/build.rb release` → `build/Mimir-release.apk`
-- [x] Play bundle: `aapt2 link --proto-format` + bundletool 1.18.3 → `build/Mimir.aab` (validated); `bin/build.rb bundle --play` hides Donate
+- [x] Play bundle (Ruby pipeline, no billing): `bin/build.rb bundle --play`. **Play bundle with billing: `bin/build.rb gbundle`** → `app/build/outputs/bundle/release/app-release.aab` (R8-shrunk; release-signed; 4.3 MB debug → ~1 MB release)
 - [ ] Store listing assets: icon (adaptive), feature graphic, screenshots (DeX), short/long description, privacy policy (no data collection)
 - [x] About page: licenses (mruby, mruby-json, Opal MIT; DevTools frontend BSD), version, Donate + Source links (from mimir.config.json)
 - [~] GitHub repo https://github.com/RaneMstSage/Mimir — pushed (clean history, MIT, README). First Release (APK) pending on-device check of Scripts.
