@@ -36,6 +36,10 @@ SO_DIR     = File.join(STAGE, 'lib', 'arm64-v8a')
 SO_OUT     = File.join(SO_DIR, 'libmimir.so')
 SO_UNSTRIPPED = File.join(BUILD, 'libmimir.unstripped.so')
 ALLOWED_NEEDED = %w[libc.so libm.so libdl.so liblog.so]
+RELEASE_KS  = File.join(TOOLS, 'release.keystore')
+RELEASE_ENV = File.join(TOOLS, 'release.env')
+BUNDLETOOL  = File.join(TOOLS, 'bundletool.jar')
+OUT_AAB     = File.join(BUILD, 'Mimir.aab')
 
 def sh(*cmd, quiet: false)
   puts "→ #{cmd.join(' ')[0, 160]}" unless quiet
@@ -233,6 +237,61 @@ def gen_buildinfo
   File.write(out, src) unless File.exist?(out) && File.read(out) == src
 end
 
+def release_creds
+  abort "missing #{RELEASE_KS} / #{RELEASE_ENV} (see PLAN.md: release signing)" unless File.exist?(RELEASE_KS) && File.exist?(RELEASE_ENV)
+  env = File.read(RELEASE_ENV).scan(/^(\w+)=(.*)$/).to_h
+  [env['MIMIR_KEYSTORE_PASS'], env['MIMIR_KEY_ALIAS'] || 'mimir']
+end
+
+# Signed release APK (GitHub Releases / sideload). Same pipeline as build, release key.
+def release
+  build
+  pass, alias_ = release_creds
+  out = File.join(BUILD, 'Mimir-release.apk')
+  sh('apksigner', 'sign', '--ks', RELEASE_KS, '--ks-pass', "pass:#{pass}", '--key-pass', "pass:#{pass}",
+     '--ks-key-alias', alias_, '--min-sdk-version', MIN_SDK.to_s, '--out', out, File.join(BUILD, 'staged.apk'))
+  sh('apksigner', 'verify', out, quiet: true)
+  puts "✓ release APK #{out} (#{(File.size(out) / 1024.0).round} KB)"
+end
+
+# Play Store bundle (.aab): resources linked in proto format, module zip laid out per bundletool,
+# then bundletool build-bundle and jarsigner (bundles use JAR signing; Play re-signs the APKs).
+def bundle
+  gen_buildinfo
+  check_tools
+  mrb; native; opal
+  abort "missing #{BUNDLETOOL}" unless File.exist?(BUNDLETOOL)
+  pass, alias_ = release_creds
+  manifest = File.join(ANDROID, 'AndroidManifest.xml')
+  res_zip  = File.join(BUILD, 'res.zip')
+  proto    = File.join(BUILD, 'proto.apk')
+  mod_dir  = File.join(BUILD, 'aab', 'base')
+  FileUtils.rm_rf(File.join(BUILD, 'aab')); FileUtils.mkdir_p(mod_dir)
+  sh('aapt2', 'compile', '--dir', File.join(ANDROID, 'res'), '-o', res_zip)
+  sh('aapt2', 'link', '--proto-format', '-o', proto, '-I', JAR, '--manifest', manifest,
+     '--min-sdk-version', MIN_SDK.to_s, '--target-sdk-version', TGT_SDK.to_s, '--auto-add-overlay', res_zip)
+  # unpack the proto apk into the module layout: manifest/AndroidManifest.xml, res/, resources.pb
+  Dir.chdir(mod_dir) do
+    sh('unzip', '-q', '-o', proto)
+    FileUtils.mkdir_p('manifest'); FileUtils.mv('AndroidManifest.xml', 'manifest/AndroidManifest.xml')
+    FileUtils.mkdir_p('dex'); FileUtils.cp(File.join(BUILD, 'dex', 'classes.dex'), 'dex/classes.dex')
+    FileUtils.cp_r(File.join(STAGE, 'lib'), 'lib')
+    FileUtils.cp_r(File.join(STAGE, 'assets'), 'assets')
+    assets = File.join(ANDROID, 'assets')
+    FileUtils.cp_r(Dir[File.join(assets, '*')], 'assets') if Dir.exist?(assets)
+    FileUtils.rm_f(Dir['META-INF/**/*'])
+    FileUtils.rm_f('base.zip')
+    sh('zip', '-q', '-r', '../base.zip', '.', '-x', '.*')
+  end
+  # dex must exist: `build` (via mrb/native/opal above) does not compile java; do it if missing
+  abort 'no classes.dex — run bin/build.rb build first' unless File.exist?(File.join(BUILD, 'dex', 'classes.dex'))
+  FileUtils.rm_f(OUT_AAB)
+  sh('java', '-jar', BUNDLETOOL, 'build-bundle', "--modules=#{File.join(BUILD, 'aab', 'base.zip')}", "--output=#{OUT_AAB}")
+  sh('jarsigner', '-keystore', RELEASE_KS, '-storepass', pass, '-keypass', pass, '-sigalg', 'SHA256withRSA', '-digestalg', 'SHA-256', OUT_AAB, alias_, quiet: true)
+  sh('java', '-jar', BUNDLETOOL, 'validate', "--bundle=#{OUT_AAB}", quiet: true)
+  puts "✓ Play bundle #{OUT_AAB} (#{(File.size(OUT_AAB) / 1024.0).round} KB) — upload in Play Console"
+end
+
 def build
   gen_buildinfo
   check_tools
@@ -306,7 +365,7 @@ def run
   system('am', 'start', '-n', "#{PKG}/.MainActivity") || puts('could not launch; open the app manually')
 end
 
-case ARGV[0] || 'build'
+case (ARGV.reject { |a| a.start_with?('--') }[0] || 'build')
 when 'fetch'   then fetch
 when 'mruby'   then mruby
 when 'mrb'     then mrb
@@ -314,8 +373,10 @@ when 'native'  then native
 when 'test'    then test
 when 'opal'    then opal
 when 'build'   then build
+when 'release' then release
+when 'bundle'  then build; bundle
 when 'install' then build; install
 when 'run'     then run
 when 'clean'   then Dir[File.join(BUILD, '*')].each { |f| FileUtils.rm_rf(f) unless File.basename(f) == 'mruby' }; puts 'cleaned (kept build/mruby)'
-else abort 'usage: bin/build.rb [fetch|mruby|mrb|native|opal|test|build|install|run|clean]'
+else abort 'usage: bin/build.rb [fetch|mruby|mrb|native|opal|test|build|release|bundle|install|run|clean] [--play]'
 end

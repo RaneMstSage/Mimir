@@ -16,3 +16,6 @@ vendor/mruby-json/
 tools/node_modules/
 # generated from mimir.config.json by bin/build.rb
 android/src/com/mstsage/mimir/BuildInfo.java
+tools/release.keystore
+tools/release.env
+tools/bundletool.jar

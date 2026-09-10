@@ -39,12 +39,12 @@ Design target: what a modern desktop browser does, in a compact dark theme.
 - [ ] Offline DevTools frontend; `extractNativeLibs=false` + Ruby zip aligner; release keystore; DeX window behaviour; about page (mruby/Chromium versions).
 
 ## Phase 6 — Release
-- [ ] Release keystore (`tools/release.keystore`, kept out of git) + `bin/build.rb release` (signed APK)
-- [ ] Play bundle: `aapt2 link --proto-format` + bundletool → `.aab`; `bin/build.rb bundle`
+- [x] Release keystore (`tools/release.keystore` + `tools/release.env`, ignored; RSA-4096, 30y, alias mimir) + `bin/build.rb release` → `build/Mimir-release.apk`
+- [x] Play bundle: `aapt2 link --proto-format` + bundletool 1.18.3 → `build/Mimir.aab` (validated); `bin/build.rb bundle --play` hides Donate
 - [ ] Store listing assets: icon (adaptive), feature graphic, screenshots (DeX), short/long description, privacy policy (no data collection)
-- [ ] About page: licenses (mruby, mruby-json, Opal — MIT), version, links
+- [x] About page: licenses (mruby, mruby-json, Opal MIT; DevTools frontend BSD), version, Donate + Source links (from mimir.config.json)
 - [ ] GitHub repo + Releases with APK (Obtainium-friendly); README for users
-- [ ] Monetization decision (user's call): paid listing on Play (no SDK) vs free + later Pro; no ads
+- [~] Monetization: user open to Play Billing donations; Billing 9.1 = 50 transitive libs (AndroidX, Kotlin stdlib, Firebase encoders, Play Services) → deferred past v1 (needs a Ruby Maven/AAR resolver). v1: paid or free listing; external Donate in GitHub build only.
 - [ ] Pre-release QA checklist: fresh install, settings/bookmarks/scripts persistence, DevTools attach, DeX resize, rotation, back button, external links, downloads (not yet handled), file chooser (not yet handled)
 
 ## Notes
