@@ -13,3 +13,4 @@ tools/debug.keystore
 # vendored sources (bin/build.rb fetch)
 vendor/mruby/
 vendor/mruby-json/
+tools/node_modules/

@@ -1,5 +1,6 @@
 :root{--bg:#0f172a;--bar:#1e293b;--strip:#020617;--fg:#e2e8f0;--muted:#94a3b8;--acc:#38bdf8;--ok:#22c55e;--field:#0b1220;--line:#334155}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none}
+[hidden]{display:none !important}   /* author display rules below must never override the hidden attribute */
 html,body{margin:0;background:var(--strip);color:var(--fg);font:13px/1.3 system-ui,Roboto,sans-serif;overflow:hidden;height:100%}
 button{background:none;border:0;color:var(--fg);font:inherit;padding:0;cursor:pointer}
 /* tab strip */
