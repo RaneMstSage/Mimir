@@ -9,7 +9,7 @@ global.setTimeout = (f)=>f();
 try {
   require(require('path').resolve(process.argv[2]));
   if (!(els.tabs && els.tabs.innerHTML.length)) throw new Error('tabs did not render');
-  const st = {"tabs":[{"id":1,"url":"https://a.test/","title":"A","progress":100,"loading":false,"favicon":null}],"current":1,"url":"https://a.test/","progress":100,"loading":false,"desktop":true,"can_back":false,"can_forward":false,"bookmarks":[],"history":[],"bookmarks_bar":true,"devtools":{"open":false,"side":"right","fraction":0.45}};
+  const st = {"tabs":[{"id":1,"url":"https://a.test/","title":"A","progress":100,"loading":false,"favicon":null}],"current":1,"url":"https://a.test/","progress":100,"loading":false,"desktop":true,"can_back":false,"can_forward":false,"bookmarks":{"bar":{"id":"bar","type":"folder","title":"Bookmarks bar","children":[]},"other":{"id":"other","type":"folder","title":"Other bookmarks","children":[]}},"bookmarks_flat":[],"history":[],"bookmarks_bar":true,"devtools":{"open":false,"side":"right","fraction":0.45}};
   global.UI.receive(JSON.stringify(st));
   if (!els.toolbar.innerHTML.includes('id="url"')) throw new Error('toolbar did not render');
   // simulate a tap on the "+" (new tab) button

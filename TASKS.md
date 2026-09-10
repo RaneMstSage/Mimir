@@ -29,7 +29,7 @@ Design target: what a modern desktop browser does, in a compact dark theme.
 - [x] Chrome WebView + `ChromeBridge.send(json)` → Ruby events (chrome.height handled locally); `ui.state` → `UI.receive(json)`; chrome excluded from DevTools targets; omnibox keeps focus while typing.
 - [~] Tab strip: favicon + title, × close, + new tab, active/loading state, scroll. (drag order later)
 - [~] Toolbar: back/forward/reload/stop, omnibox + suggestions (history/bookmarks), ★, Desktop/Mobile, DevTools, ⋮ menu (dock in menu). Needs on-device check.
-- [~] **Bookmarks**: star, bar toggle, manager page (rename inline, delete, open, search). Folders later.
+- [~] **Bookmarks** (Chrome model): Bookmarks bar + Other bookmarks roots, nested folders, bar folder dropdowns, star → "Bookmark added" popup (name + folder), manager with folder tree, breadcrumb, new folder, move, rename, delete, search; legacy list migrated. On-device check pending.
 - [x] History (200 entries) for omnibox suggestions + History page grouped by day with remove/clear; stored by Ruby.
 - [x] Removed XML toolbar/tab strip; Rb pane stays as a developer drawer (menu → Ruby console).
 

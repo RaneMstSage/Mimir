@@ -65,10 +65,25 @@ test "Browser: devtools toggle docks and attaches current url; ua toggle reloads
   assert Inspect.emitted.any? { |c| c["cmd"] == "tab.reload" }
 end
 
-test "Bookmarks: toggle, history visit dedupes and caps" do
+test "Bookmarks tree: toggle adds to bar, folders, move, rename, remove; history dedupes" do
   bm = Bookmarks.new(nil)
-  assert_equal true, bm.toggle("https://a.test/", "A")
-  assert_equal false, bm.toggle("https://a.test/", "A")
+  n = bm.toggle("https://a.test/", "A")
+  assert_equal "url", n["type"]
+  assert_equal ["https://a.test/"], bm.bar["children"].map { |c| c["url"] }
+  f = bm.new_folder("bar", "Work")
+  assert bm.move(n["id"], f["id"])
+  assert_equal [], bm.bar["children"].select { |c| c["type"] == "url" }
+  assert_equal "https://a.test/", f["children"][0]["url"]
+  assert_equal false, bm.move(f["id"], f["id"])            # folder into itself
+  sub = bm.new_folder(f["id"], "Sub")
+  assert_equal false, bm.move(f["id"], sub["id"])          # folder into its descendant
+  assert bm.rename(n["id"], "Renamed")
+  assert_equal "Renamed", bm.find(n["id"])["title"]
+  assert_equal true, bm.bookmarked?("https://a.test/")
+  assert_equal nil, bm.toggle("https://a.test/", "A")     # second toggle removes
+  assert_equal false, bm.bookmarked?("https://a.test/")
+  assert_equal false, bm.remove("bar")
+  assert_equal 4, bm.folders.size                           # bar, other, Work, Sub
   bm.visit("https://h.test/1", "one"); bm.visit("https://h.test/2", "two"); bm.visit("https://h.test/1", "one again")
   assert_equal ["https://h.test/1", "https://h.test/2"], bm.history.map { |h| h["url"] }
   bm.visit("about:blank", "x")
@@ -114,11 +129,11 @@ test "History/bookmarks management" do
   bm.visit("https://h1.test/", "H1"); bm.visit("https://h2.test/", "H2")
   br.history_remove("https://h1.test/")
   assert_equal ["https://h2.test/"], bm.history.map { |h| h["url"] }
-  bm.toggle("https://b.test/", "B")
-  br.bookmark_rename("https://b.test/", "Better")
-  assert_equal "Better", bm.list[0]["title"]
-  br.bookmark_remove("https://b.test/")
-  assert_equal [], bm.list
+  n = bm.toggle("https://b.test/", "B")
+  br.bookmark_update(n["id"], "Better", "other")
+  assert_equal "Better", bm.other["children"][0]["title"]
+  br.bookmark_remove(n["id"])
+  assert_equal [], bm.urls
   Inspect.emitted.clear
   br.clear_data(["history", "cache"])
   assert_equal [], bm.history

@@ -187,6 +187,7 @@ def opal
   end
   puts err.lines.grep_v(/backtick_javascript/).join unless err.strip.empty?
   File.write(out_js, js)
+  %w[ui.html ui.css].each { |f| FileUtils.cp(File.join(UI_DIR, f), UI_OUT) }   # before the checks: they load the shell
   out, st2 = Open3.capture2e('node', '--check', out_js)
   abort "✗ ui.js is not valid JavaScript:\n#{out}" unless st2.success?
   # Boot the bundle against a stub DOM: catches Opal runtime errors (e.g. mutable-string calls).
@@ -198,7 +199,6 @@ def opal
     abort "✗ ui.js failed in jsdom:\n#{out}" unless st4.success?
     puts out.lines.last.to_s.strip
   end
-  %w[ui.html ui.css].each { |f| FileUtils.cp(File.join(UI_DIR, f), UI_OUT) }
   puts "✓ #{out_js} (#{(File.size(out_js) / 1024).round} KB incl. Opal runtime)"
 end
 

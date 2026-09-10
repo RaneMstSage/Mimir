@@ -106,8 +106,8 @@ class Browser
   # ---- bookmarks ------------------------------------------------------------------------
   def toggle_bookmark
     return unless @current && @bookmarks
-    now = @bookmarks.toggle(@current.url, @current.title, @current.favicon)
-    Host.toast(now ? "Bookmarked" : "Bookmark removed")
+    node = @bookmarks.toggle(@current.url, @current.title, @current.favicon)
+    Host.toast(node ? "Bookmark added" : "Bookmark removed")
     push_state
   end
 
@@ -147,12 +147,9 @@ class Browser
   end
 
   def history_remove(url) ; @bookmarks.history.reject! { |h| h["url"] == url } ; @bookmarks.save ; push_state ; end
-  def bookmark_remove(url) ; @bookmarks.remove(url) ; push_state ; end
-  def bookmark_rename(url, title)
-    b = @bookmarks.list.find { |x| x["url"] == url } or return
-    b["title"] = title.to_s.empty? ? url : title.to_s
-    @bookmarks.save ; push_state
-  end
+  def bookmark_remove(id) ; @bookmarks.remove(id) ; push_state ; end
+  def bookmark_update(id, title, parent) ; @bookmarks.update(id, title, parent) ; push_state ; end
+  def folder_new(parent, title) ; @bookmarks.new_folder(parent, title) ; push_state ; end
 
   def page_title(id, title)
     t = find(id) or return
@@ -218,7 +215,8 @@ class Browser
       "desktop" => desktop?,
       "can_back" => @current ? @current.can_back : false,
       "can_forward" => @current ? @current.can_forward : false,
-      "bookmarks" => @bookmarks ? @bookmarks.list : [],
+      "bookmarks" => @bookmarks ? { "bar" => @bookmarks.bar, "other" => @bookmarks.other } : { "bar" => { "children" => [] }, "other" => { "children" => [] } },
+      "bookmarks_flat" => @bookmarks ? @bookmarks.urls : [],
       "history" => @bookmarks ? @bookmarks.history : [],
       "bookmarks_bar" => @settings["bookmarks_bar"] ? true : false,
       "settings" => @settings.to_h,
