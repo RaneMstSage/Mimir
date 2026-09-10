@@ -99,3 +99,10 @@ select,.row input[type=text],.row input[type=number]{background:var(--field);col
 .tree button.on{background:#1e3a5f;color:var(--acc)}
 .row.folder .l b::before{content:"📁 "}
 .row select.mv{max-width:160px}
+/* ---- scripts page ---- */
+.editor{width:100%;min-height:220px;background:#0b1220;color:#e2e8f0;border:1px solid var(--line);border-radius:8px;padding:10px;font:12px/1.45 ui-monospace,Menlo,monospace;resize:vertical;outline:0;white-space:pre;overflow:auto;tab-size:2}
+.row textarea.small{min-height:70px}
+.chip{display:inline-block;background:#0b1220;color:var(--muted);border-radius:6px;padding:2px 8px;font-size:11px;margin-right:6px}
+.chip.on{color:var(--ok)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:900px){.grid2{grid-template-columns:1fr}}

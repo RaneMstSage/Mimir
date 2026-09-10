@@ -35,8 +35,17 @@ Design target: what a modern desktop browser does, in a compact dark theme.
 
 ### Phase 5 — Settings, scripts, polish
 - [~] **Settings page** (Ruby-owned, Opal overlay, Chrome-style nav + cards): search engine, home page, desktop default, bookmarks bar, force dark, text size, JavaScript, third-party cookies, clear data, DevTools dock/theme/screencast. On-device check pending.
-- [ ] **Scripts & styles** (the extension substitute): per-site user JS/CSS injected at document-start/end, enable/disable, import from URL; request blocking/rewrite rules via `shouldInterceptRequest`.
+- [~] **Scripts & styles** (the extension substitute): per-site JS/CSS with URL globs, page start/end, enable/disable, editor, "run on current tab", import from URL (reads ==UserScript== headers), request-blocking globs via `shouldInterceptRequest`. On-device check pending.
 - [ ] Offline DevTools frontend; `extractNativeLibs=false` + Ruby zip aligner; release keystore; DeX window behaviour; about page (mruby/Chromium versions).
+
+## Phase 6 — Release
+- [ ] Release keystore (`tools/release.keystore`, kept out of git) + `bin/build.rb release` (signed APK)
+- [ ] Play bundle: `aapt2 link --proto-format` + bundletool → `.aab`; `bin/build.rb bundle`
+- [ ] Store listing assets: icon (adaptive), feature graphic, screenshots (DeX), short/long description, privacy policy (no data collection)
+- [ ] About page: licenses (mruby, mruby-json, Opal — MIT), version, links
+- [ ] GitHub repo + Releases with APK (Obtainium-friendly); README for users
+- [ ] Monetization decision (user's call): paid listing on Play (no SDK) vs free + later Pro; no ads
+- [ ] Pre-release QA checklist: fresh install, settings/bookmarks/scripts persistence, DevTools attach, DeX resize, rotation, back button, external links, downloads (not yet handled), file chooser (not yet handled)
 
 ## Notes
 - Opal gotcha (cost us three 'renders but invisible' bugs): the last expression of a method gets `return`; a backtick with `a; b` there runs only `a`. `bin/build.rb opal` now lints for it; use `UI.show/hide`.

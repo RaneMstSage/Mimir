@@ -12,6 +12,7 @@ module UI
   @bm_popup = nil         # url whose star popup is open
   @bm_pending = nil       # url just starred; popup opens once Ruby's state confirms it
   @mgr_folder = "bar"     # bookmarks manager: current folder id
+  @script_id = nil        # scripts page: script being edited (nil = list)
   @menu_open = false
   @page = nil            # nil | "settings" | "history" | "bookmarks" | "about"
   @section = nil         # settings section
@@ -27,6 +28,10 @@ module UI
     @state = JSON.parse(`String(#{json})`)
     if @bm_pending && flat.any? { |b| b["url"] == @bm_pending }
       @bm_popup = @bm_pending ; @bm_pending = nil
+    end
+    if @script_id == :newest
+      last = (@state["scripts"] || []).last
+      @script_id = last ? last["id"] : nil
     end
     if @page && `document.activeElement && document.activeElement.closest('#page')`
       render_tabs ; render_toolbar ; render_bookmarks     # don't rebuild the page while typing in it
@@ -262,6 +267,7 @@ module UI
       ["bookmark.toggle", "Bookmark this page", "☆"],
       ["page:bookmarks", "Bookmarks", "›"],
       ["page:history", "History", "›"],
+      ["page:scripts", "Scripts & styles", "›"],
       ["bookmarks.bar", "Show bookmarks bar", @state["bookmarks_bar"] ? "✓" : ""],
       :hr,
       ["ua.toggle", "Request #{@state["desktop"] ? 'mobile' : 'desktop'} site", ""],
@@ -375,6 +381,15 @@ module UI
            "title" => `String(document.getElementById('bmpop-title').value || "")`,
            "parent" => `String(document.getElementById('bmpop-folder').value || "")`)
       @bm_popup = nil ; render_bmpop ; sync_height
+    when "script.edit"   then @script_id = `String(#{target}.dataset.id || "")` ; render_page
+    when "script.list"   then @script_id = nil ; render_page
+    when "script.new"    then send("script.add", "attrs" => { "name" => "New script", "match" => [@state["url"].to_s.empty? ? "*" : @state["url"].to_s.split("/")[0..2].join("/") + "/*"] }) ; @script_id = :newest
+    when "script.toggle" then send("script.toggle", "id" => `String(#{target}.dataset.id || "")`)
+    when "script.remove" then send("script.remove", "id" => `String(#{target}.dataset.id || "")`) ; @script_id = nil
+    when "script.save"   then save_script(`String(#{target}.dataset.id || "")`)
+    when "script.run"    then send("script.run", "id" => `String(#{target}.dataset.id || "")`)
+    when "script.import" then send("script.import", "url" => `String((document.getElementById('imp-url') || {}).value || "")`)
+    when "blocks.save"   then send("blocks.set", "patterns" => `String((document.getElementById('blocks') || {}).value || "")`.split("\n"))
     when "mgr.folder"
       @mgr_folder = `String(#{target}.dataset.id || "")` ; render_page
     when "mgr.newfolder"
@@ -425,7 +440,7 @@ module UI
     unless @page
       `#{pg}.hidden = true` ; return
     end
-    title = { "settings" => "Settings", "history" => "History", "bookmarks" => "Bookmarks", "about" => "About" }[@page] || @page
+    title = { "settings" => "Settings", "history" => "History", "bookmarks" => "Bookmarks", "about" => "About", "scripts" => "Scripts & styles" }[@page] || @page
     search = @page == "history" || @page == "bookmarks" ? "<input type=\"search\" placeholder=\"Search #{title.downcase}\" value=\"#{esc(@filter)}\" oninput=\"UI.filter(this.value)\">" : ""
     nav = ""
     body = case @page
@@ -435,6 +450,7 @@ module UI
              settings_section(@section)
            when "history"  then history_body
            when "bookmarks" then nav = bookmarks_nav ; bookmarks_body
+           when "scripts"  then scripts_body
            when "about"    then about_body
            else "<div class=\"empty\">Unknown page</div>"
            end
@@ -549,6 +565,45 @@ module UI
 
   def self.rename_from(input)
     send("bookmark.update", "id" => `String(#{input}.dataset.rename || "")`, "title" => `String(#{input}.value || "")`)
+  end
+
+  def self.scripts_body
+    scripts = @state["scripts"] || []
+    if @script_id && (sc = scripts.find { |x| x["id"].to_s == @script_id.to_s })
+      return script_editor(sc)
+    end
+    rows = scripts.map do |sc|
+      "<div class=\"row\"><div class=\"l\"><b>#{esc(sc["name"])}</b><small><span class=\"chip#{sc["enabled"] ? ' on' : ''}\">#{sc["enabled"] ? 'on' : 'off'}</span><span class=\"chip\">#{sc["type"] == 'css' ? 'style' : 'script'}</span><span class=\"chip\">#{sc["run_at"] == 'start' ? 'page start' : 'page end'}</span>#{esc((sc["match"] || []).join(', '))}</small></div>" \
+      "<button class=\"sw#{sc["enabled"] ? ' on' : ''}\" data-act=\"script.toggle\" data-id=\"#{sc["id"]}\" aria-label=\"Enable\"></button>" \
+      "<button class=\"btn\" data-act=\"script.edit\" data-id=\"#{sc["id"]}\">Edit</button>" \
+      "<button class=\"del\" data-act=\"script.remove\" data-id=\"#{sc["id"]}\" aria-label=\"Delete\">✕</button></div>"
+    end
+    list = rows.empty? ? "<div class=\"empty\">No scripts yet. Scripts and styles run on pages whose URL matches their patterns — the extension substitute.</div>" : "<div class=\"card\">#{rows.join}</div>"
+    "<h2>Your scripts &amp; styles</h2>" \
+    "<div class=\"row\" style=\"padding:0 0 10px;gap:8px\"><button class=\"btn\" data-act=\"script.new\">New script for this site</button>" \
+    "<input type=\"text\" id=\"imp-url\" placeholder=\"https://…/something.user.js or .css\" style=\"flex:1\"><button class=\"btn\" data-act=\"script.import\">Import from URL</button></div>" + list +
+    "<h2>Block requests</h2><div class=\"card\"><div class=\"row\" style=\"align-items:flex-start\"><div class=\"l\"><b>URL patterns, one per line</b><small>Sub-resources matching these never load (e.g. *doubleclick.net*). Main pages are never blocked.</small>" \
+    "<textarea id=\"blocks\" class=\"editor small\">#{esc((@state["blocks"] || []).join("\n"))}</textarea></div><button class=\"btn\" data-act=\"blocks.save\">Save</button></div></div>"
+  end
+
+  def self.script_editor(sc)
+    "<div class=\"crumbs\"><button data-act=\"script.list\">Scripts &amp; styles</button> › <b>#{esc(sc["name"])}</b></div>" \
+    "<div class=\"card\">" \
+      "<div class=\"row\"><div class=\"l\"><b>Name</b></div><input type=\"text\" id=\"sc-name\" value=\"#{esc(sc["name"])}\"></div>" \
+      "<div class=\"row\"><div class=\"l\"><b>Type</b></div><select id=\"sc-type\"><option value=\"js\"#{sc["type"] == 'js' ? ' selected' : ''}>JavaScript</option><option value=\"css\"#{sc["type"] == 'css' ? ' selected' : ''}>CSS</option></select></div>" \
+      "<div class=\"row\"><div class=\"l\"><b>Run at</b><small>Page start runs as early as WebView allows; page end after load</small></div><select id=\"sc-runat\"><option value=\"start\"#{sc["run_at"] == 'start' ? ' selected' : ''}>Page start</option><option value=\"end\"#{sc["run_at"] == 'end' ? ' selected' : ''}>Page end</option></select></div>" \
+      "<div class=\"row\" style=\"align-items:flex-start\"><div class=\"l\"><b>URL patterns</b><small>One per line; * matches anything, e.g. https://*.theodinproject.com/*</small><textarea id=\"sc-match\" class=\"editor small\">#{esc((sc["match"] || []).join("\n"))}</textarea></div></div>" \
+      "<div class=\"row\" style=\"align-items:flex-start\"><div class=\"l\"><b>Code</b>#{sc["source"] ? "<small>Imported from #{esc(sc["source"])}</small>" : ''}<textarea id=\"sc-code\" class=\"editor\" spellcheck=\"false\">#{esc(sc["code"])}</textarea></div></div>" \
+      "<div class=\"row\"><div class=\"l\"></div><button class=\"btn\" data-act=\"script.run\" data-id=\"#{sc["id"]}\">Run on current tab</button><button class=\"btn danger\" data-act=\"script.remove\" data-id=\"#{sc["id"]}\">Delete</button><button class=\"btn\" style=\"background:var(--acc);color:#082f49\" data-act=\"script.save\" data-id=\"#{sc["id"]}\">Save</button></div>" \
+    "</div>"
+  end
+
+  def self.save_script(id)
+    v = ->(eid) { `String((document.getElementById(#{eid}) || {}).value || "")` }
+    send("script.update", "id" => id, "attrs" => {
+      "name" => v.call("sc-name"), "type" => v.call("sc-type"), "run_at" => v.call("sc-runat"),
+      "match" => v.call("sc-match").split("\n"), "code" => v.call("sc-code") })
+    `document.activeElement && document.activeElement.blur()`
   end
 
   def self.about_body

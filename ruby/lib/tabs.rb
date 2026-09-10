@@ -16,9 +16,10 @@ class Browser
   attr_reader :tabs, :current, :settings
   attr_accessor :devtools_open
 
-  def initialize(settings, bookmarks = nil)
+  def initialize(settings, bookmarks = nil, scripts = nil)
     @settings = settings
     @bookmarks = bookmarks
+    @scripts = scripts
     @tabs = []
     @current = nil
     @next_id = 1
@@ -85,6 +86,7 @@ class Browser
     t.can_back = can_back unless can_back.nil?
     t.can_forward = can_forward unless can_forward.nil?
     @bookmarks.visit(t.url, t.title, t.favicon) if @bookmarks
+    inject(t, "end")
     push_state
   end
 
@@ -100,8 +102,17 @@ class Browser
     t.loading = true
     t.progress = 5
     t.favicon = nil
+    inject(t, "start")
     push_state
   end
+
+  def inject(t, run_at)
+    return unless @scripts
+    js = @scripts.payload(t.url, run_at)
+    Host.emit("tab.inject", "tab" => t.id, "js" => js) if js
+  end
+
+  def push_blocks ; Host.emit("block.rules", "patterns" => @scripts ? @scripts.blocks : []) ; end
 
   # ---- bookmarks ------------------------------------------------------------------------
   def toggle_bookmark
@@ -220,6 +231,8 @@ class Browser
       "history" => @bookmarks ? @bookmarks.history : [],
       "bookmarks_bar" => @settings["bookmarks_bar"] ? true : false,
       "settings" => @settings.to_h,
+      "scripts" => @scripts ? @scripts.list : [],
+      "blocks" => @scripts ? @scripts.blocks : [],
       "version" => { "app" => App::VERSION, "ruby" => Inspect.version },
       "devtools" => { "open" => @devtools_open, "side" => @settings["dock_side"], "fraction" => @settings["dock_fraction"] }
     }

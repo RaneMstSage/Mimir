@@ -139,3 +139,46 @@ test "History/bookmarks management" do
   assert_equal [], bm.history
   assert Inspect.emitted.any? { |c| c["cmd"] == "data.clear" && c["cache"] == true && c["cookies"] == false }
 end
+
+test "Scripts: glob matching" do
+  assert Scripts.glob?("https://*.theodinproject.com/*", "https://www.theodinproject.com/lessons/x")
+  assert_equal false, Scripts.glob?("https://*.theodinproject.com/*", "https://theodinproject.com/")
+  assert Scripts.glob?("*://example.com/*", "http://example.com/a")
+  assert Scripts.glob?("*", "https://anything/")
+  assert Scripts.glob?("https://a.test/exact", "https://a.test/exact")
+  assert_equal false, Scripts.glob?("https://a.test/exact", "https://a.test/exact/no")
+  assert Scripts.glob?("*github.com*", "https://github.com/x")
+end
+
+test "Scripts: selection, payload, import of userscript headers, blocks" do
+  sc = Scripts.new(nil)
+  js = sc.add("name" => "Hi", "match" => "https://a.test/*", "code" => "console.log(1)", "run_at" => "end")
+  css = sc.add("name" => "Dark", "type" => "css", "match" => ["*"], "code" => "body{background:#000}", "run_at" => "start")
+  assert_equal [css["id"]], sc.for_url("https://a.test/p", "start").map { |x| x["id"] }
+  assert_equal [js["id"]], sc.for_url("https://a.test/p", "end").map { |x| x["id"] }
+  assert_equal nil, sc.payload("https://b.test/", "end")
+  assert sc.payload("https://a.test/p", "end").include?("console.log(1)")
+  assert sc.payload("https://a.test/p", "start").include?("createElement('style')")
+  sc.toggle(js["id"])
+  assert_equal [], sc.for_url("https://a.test/p", "end")
+  us = "// ==UserScript==\n// @name  Odin Helper\n// @match https://www.theodinproject.com/*\n// @run-at document-start\n// ==/UserScript==\nconsole.log('hi')"
+  imp = sc.import("https://x.test/odin.user.js", us)
+  assert_equal "Odin Helper", imp["name"]
+  assert_equal ["https://www.theodinproject.com/*"], imp["match"]
+  assert_equal "start", imp["run_at"]
+  sc.set_blocks(["*doubleclick.net*", "", "*doubleclick.net*"])
+  assert_equal ["*doubleclick.net*"], sc.blocks
+  sc.remove(css["id"])
+  assert_equal 2, sc.list.size
+end
+
+test "Browser: page events inject matching scripts" do
+  sc = Scripts.new(nil)
+  sc.add("name" => "x", "match" => "https://s.test/*", "code" => "1+1", "run_at" => "end")
+  br = Browser.new(Settings.new(nil), Bookmarks.new(nil), sc)
+  br.new_tab("https://s.test/")
+  Inspect.emitted.clear
+  br.page_finished(1, "https://s.test/", false, false)
+  inj = Inspect.emitted.find { |c| c["cmd"] == "tab.inject" }
+  assert inj && inj["js"].include?("1+1"), "expected tab.inject"
+end
