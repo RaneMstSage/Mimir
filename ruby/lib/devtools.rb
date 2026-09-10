@@ -36,7 +36,8 @@ module DevTools
   # Frontend URL whose websocket points at our relay: ws=127.0.0.1:<port>/<token>/devtools/page/<id>
   def self.frontend_url(target, relay_port, token, webkit_version = nil)
     id = target["id"].to_s
-    ws = "127.0.0.1:#{relay_port}/#{token}/devtools/page/#{id}"
+    tok = token.to_s.empty? ? "" : "#{token}/"          # Java fallback relay has no token
+    ws = "127.0.0.1:#{relay_port}/#{tok}devtools/page/#{id}"
     u = target["devtoolsFrontendUrl"].to_s
     if u.start_with?("http")
       i = u.index("ws=")

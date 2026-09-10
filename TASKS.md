@@ -20,8 +20,8 @@
 - [~] Verify Elements/Console/Network through the Ruby relay on device; verify forced fallback path.
 
 ### Phase 3 — App logic in Ruby (medium)
-- [ ] `lib/tabs.rb`, `lib/urlnorm.rb`, `lib/settings.rb` (files_dir/settings.json), dispatch in `app.rb`; `MainActivity` → view wiring + `execute(json)` only; delete `DevToolsClient.java`.
-- [ ] `bin/build.rb test`: `ruby/test` under the built `mruby` CLI with a fake `Inspect` host. Commit.
+- [x] `lib/tabs.rb` (Browser/Tab), `lib/urlnorm.rb`, `lib/settings.rb`, event handlers in `app.rb`; `MainActivity` rewritten as a logic-free view host driven by `ui.state` + commands; `DevToolsClient.java` deleted; Java fallback relay reports `bridge.java_ready`.
+- [x] `bin/build.rb test`: 14 tests green under the built mruby CLI (relay, devtools, urlnorm, browser model).
 
 ### Phase 4 — UI in Ruby via Opal (large)
 User's explicit choice; the review flags cost (≈1 MB JS runtime, IME/focus quirks with nested WebViews, an extra

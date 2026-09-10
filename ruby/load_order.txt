@@ -4,4 +4,7 @@ lib/loop.rb
 lib/http.rb
 lib/devtools.rb
 lib/relay.rb
+lib/urlnorm.rb
+lib/settings.rb
+lib/tabs.rb
 app.rb

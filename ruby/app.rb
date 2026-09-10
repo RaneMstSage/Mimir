@@ -3,15 +3,16 @@
 # App.run(boot_json) never returns until a "quit" event arrives. It owns the single event loop:
 # IO.select over the native wake pipe (Java -> Ruby events) plus the DevTools relay sockets.
 module App
-  VERSION = "0.3.0"
+  VERSION = "0.4.0"
 
   @handlers = {}
   @running = false
   @relay = nil
 
   def self.on(event, &blk) ; @handlers[event] = blk ; end
-  def self.relay ; @relay ; end
-  def self.boot  ; @boot ; end
+  def self.relay   ; @relay ; end
+  def self.boot    ; @boot ; end
+  def self.browser ; @browser ; end
 
   def self.run(boot_json)
     @boot = JSON.parse(boot_json.to_s) rescue {}
@@ -19,6 +20,8 @@ module App
     wake = IO.for_fd(Inspect.wake_fd)
     Host.log(:info, "Ruby #{Inspect.version} up in pid #{Inspect.pid}; app #{VERSION}")
     Host.emit("ready", "ruby" => Inspect.version, "app" => VERSION)
+    @settings = Settings.new(@boot["files_dir"])
+    @browser = Browser.new(@settings)
     start_relay
 
     while @running
@@ -82,34 +85,76 @@ end
 
 App.on("ping") { |ev| Host.emit("pong", "t" => ev["t"]) }
 
-# Java asks for DevTools on the page currently shown (url). We find the WebView target and
-# hand back the frontend URL pointing at our relay.
-App.on("devtools.attach") do |ev|
-  url = ev["url"].to_s
-  relay = App.relay
-  unless relay
-    Host.emit("devtools.error", "text" => "relay not running")
-    next
-  end
-  target = nil
-  list = []
-  5.times do
-    list = DevTools.targets
-    target = DevTools.find_target(list, url)
-    break if target
-    sleep 0.3
-  end
-  if target
+# Find the WebView target for `url` and tell Java to load the DevTools frontend for it.
+module App
+  def self.attach_devtools(url)
+    port, token = @relay ? [@relay.port, @relay.token] : [@fallback_port, nil]
+    unless port
+      Host.emit("devtools.error", "text" => "relay not running")
+      return
+    end
+    target = nil
+    list = []
+    5.times do
+      list = DevTools.targets
+      target = DevTools.find_target(list, url)
+      break if target
+      sleep 0.3
+    end
+    unless target
+      Host.emit("devtools.error", "text" => "no target for #{url}; #{list.size} targets: " + list.map { |t| t["url"].to_s[0, 40] }.join(" | "))
+      return
+    end
     wk = target["devtoolsFrontendUrl"].to_s.start_with?("http") ? nil : DevTools.version["WebKit-Version"]
-    fe = DevTools.frontend_url(target, relay.port, relay.token, wk)
-    Host.log(:info, "attach #{target["id"]} (#{target["url"].to_s[0, 60]}) -> #{fe[0, 80]}…")
+    fe = DevTools.frontend_url(target, port, token, wk)
+    Host.log(:info, "attach #{target["id"]} (#{target["url"].to_s[0, 60]})")
     Host.emit("devtools.open", "url" => fe, "target" => target["id"])
-  else
-    Host.emit("devtools.error", "text" => "no target for #{url}; #{list.size} targets: " + list.map { |t| t["url"].to_s[0, 40] }.join(" | "))
+  rescue => e
+    Host.emit("devtools.error", "text" => "#{e.class}: #{e.message}")
   end
+end
+
+# Java started its own relay because ours failed; use its port (no token).
+App.on("bridge.java_ready") do |ev|
+  App.instance_variable_set(:@fallback_port, ev["port"].to_i)
+  Host.log(:warn, "using Java fallback relay on port #{ev["port"]}")
 end
 
 App.on("devtools.list") do |_|
   DevTools.targets.each { |t| Host.log(:info, "target #{t["id"]} #{t["type"]} #{t["url"]} #{t["description"]}") }
   Host.log(:info, "relay connections: #{App.relay ? App.relay.connections : 'n/a'}")
 end
+
+# ---- UI events (Java -> Ruby). Java has no browser logic; everything routes through Browser. ----
+b = ->() { App.browser }
+
+# Activity (re)attached. Java tells us which tab ids it still has; recreate missing ones.
+App.on("ui.ready") do |ev|
+  have = (ev["tabs"] || []).map(&:to_i)
+  if b.call.tabs.empty?
+    b.call.new_tab(ev["url"])
+  else
+    b.call.tabs.each { |t| Host.emit("tab.create", "tab" => t.id, "url" => t.url, "select" => false) unless have.include?(t.id) }
+    b.call.select_tab(b.call.current.id) if b.call.current
+  end
+  Host.emit("ua.set", "desktop" => b.call.desktop?)
+  b.call.push_state
+end
+
+App.on("navigate")      { |ev| b.call.navigate(ev["tab"], ev["text"]) }
+App.on("tab.new")       { |ev| b.call.new_tab(ev["url"]) }
+App.on("tab.select")    { |ev| b.call.select_tab(ev["tab"]) }
+App.on("tab.close")     { |ev| b.call.close_tab(ev["tab"]) }
+App.on("nav.back")      { |ev| b.call.nav(ev["tab"], "back") }
+App.on("nav.forward")   { |ev| b.call.nav(ev["tab"], "forward") }
+App.on("nav.reload")    { |ev| b.call.nav(ev["tab"], "reload") }
+App.on("page.started")  { |ev| b.call.page_started(ev["tab"], ev["url"]) }
+App.on("page.finished") { |ev| b.call.page_finished(ev["tab"], ev["url"]) }
+App.on("page.title")    { |ev| b.call.page_title(ev["tab"], ev["title"]) }
+App.on("page.progress") { |ev| b.call.page_progress(ev["tab"], ev["p"]) }
+App.on("devtools.toggle")   { |_| b.call.toggle_devtools }
+App.on("devtools.reattach") { |_| b.call.attach_devtools }
+App.on("dock.toggle")   { |_| b.call.toggle_dock }
+App.on("dock.fraction") { |ev| b.call.set_dock_fraction(ev["fraction"]) }
+App.on("ua.toggle")     { |_| b.call.toggle_ua }
+App.on("intent.url")    { |ev| b.call.new_tab(ev["url"]) }
