@@ -22,6 +22,8 @@ button{background:none;border:0;color:var(--fg);font:inherit;padding:0;cursor:po
 .ib{width:36px;height:34px;border-radius:8px;font-size:17px;color:var(--fg);display:flex;align-items:center;justify-content:center;flex:none}
 .ib:active{background:#334155}.ib.dis{opacity:.35}.ib.acc{color:var(--acc)}.ib.on{color:var(--ok)}
 .ib.txt{width:auto;padding:0 10px;font-size:12px;color:var(--muted)}
+.ib.txt .icon{display:none}
+@media (max-width:640px){.ib.txt .icon{display:inline}}
 #omni{flex:1;display:flex;align-items:center;height:32px;margin:0 6px;background:var(--field);border-radius:16px;padding:0 6px 0 12px;position:relative}
 #omni .lock{color:var(--muted);font-size:12px;margin-right:8px}
 #url{flex:1;min-width:0;background:none;border:0;outline:0;color:var(--fg);font:13px system-ui,Roboto,sans-serif;height:32px}
@@ -106,3 +108,21 @@ select,.row input[type=text],.row input[type=number]{background:var(--field);col
 .chip.on{color:var(--ok)}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 @media (max-width:900px){.grid2{grid-template-columns:1fr}}
+/* ---- narrow screens (phones) ---- */
+#omni{min-width:0}
+#url{width:0;min-width:0}
+#menu{max-height:calc(100vh - 100px);overflow-y:auto}
+#suggest{left:8px;right:8px}
+@media (max-width:640px){
+  .ib{width:32px}
+  .ib.txt{width:32px;padding:0;font-size:15px}
+  .ib.txt .label{display:none}
+  #omni{margin:0 2px;padding:0 4px 0 8px}
+  #omni .lock{margin-right:4px}
+  #bmpop{right:8px;left:8px;width:auto}
+  #page nav{width:150px}
+  #page main{padding:12px}
+  #page header input{width:140px}
+  .row input[type=text]{width:100%;min-width:0}
+  .grid2{grid-template-columns:1fr}
+}

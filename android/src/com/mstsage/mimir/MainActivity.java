@@ -485,6 +485,9 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
     private void openDevtools(String side, float fraction) {
         devtoolsOpen = true;
         dockRight = !"bottom".equals(side);
+        // A right dock on a narrow (phone-portrait) window leaves no room for the page.
+        float widthDp = getResources().getConfiguration().screenWidthDp;
+        if (widthDp < 600) dockRight = false;
         devtoolsFraction = fraction;
         divider.setVisibility(View.VISIBLE);
         devtoolsContainer.setVisibility(View.VISIBLE);
