@@ -638,7 +638,8 @@ module UI
     source = v["source"].to_s
     support = donate.empty? ? "" :
       "<div class=\"row\"><div class=\"l\"><b>Support Mímir</b><small>Mímir is free and open source. If it helps your work, a donation keeps it going.</small></div><button class=\"btn\" style=\"background:#be185d\" data-act=\"donate\">♥ Donate</button></div>"
-    src = source.empty? ? "" : "<div class=\"row\"><div class=\"l\"><b>Source code</b><small>#{esc(source)}</small></div><button class=\"btn\" data-act=\"open.page\" data-url=\"#{esc(source)}\">Open</button></div>"
+    src = source.empty? ? "" : "<div class=\"row\"><div class=\"l\"><b>Source code</b><small>#{esc(source)}</small></div><button class=\"btn\" data-act=\"open.page\" data-url=\"#{esc(source)}\">Open</button></div>" \
+      "<div class=\"row\"><div class=\"l\"><b>Privacy policy</b><small>Mímir collects no data. Read the full policy.</small></div><button class=\"btn\" data-act=\"open.page\" data-url=\"#{esc(source)}/blob/main/PRIVACY.md\">Open</button></div>"
     "<div class=\"card\"><div class=\"row\"><div class=\"l about\"><b>Mímir #{esc(v["app"])}</b>" \
     "A developer-tools browser for Android, written in Ruby — named for the Norse sage whose counsel reveals hidden knowledge.<br>" \
     "App logic and DevTools relay: mruby #{esc(v["ruby"])} embedded in the APK. Browser chrome: Ruby compiled with Opal. Engine: Android System WebView (Chromium).<br>Built on a Galaxy Tab in Termux.</div></div>" + support + src + "</div>" \
