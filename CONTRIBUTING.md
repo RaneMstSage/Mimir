@@ -21,8 +21,14 @@ to Ruby and give Java a dumb command to execute.
 
 ## Building
 
-Termux on Android 10+ (arm64). A desktop Linux box should also work with the same tools, but the
-project is developed and tested on-device.
+Termux on Android 10+ (arm64) is the supported environment; the project is developed and tested on-device.
+
+**Android Studio / desktop:** the Gradle module opens and compiles the Java, but Gradle only packages
+what the Ruby pipeline produces (`libmimir.so`, `app.mrb`, `assets/ui/`). The native stage currently
+assumes a compiler that emits Android arm64 binaries, which Termux's clang does and a desktop clang
+does not. A desktop build needs the Android NDK: mruby's `MRuby::CrossBuild` with `toolchain :android`
+for `libmruby.a`, and the NDK clang for `native/*.c`. `bin/build.rb` doesn't do that yet; see the
+"desktop build path" issue if you want to take it on. The `mrb` and `opal` stages already run anywhere.
 
     pkg install clang make aapt2 d8 apksigner zip patchelf openjdk-21 nodejs gradle librsvg
     gem install opal                                  # needs Ruby 3.x
