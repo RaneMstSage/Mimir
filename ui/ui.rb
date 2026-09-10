@@ -17,7 +17,7 @@ module UI
   end
 
   def self.receive(json)
-    @state = JSON.parse(`#{json}`)
+    @state = JSON.parse(`String(#{json})`)
     render
   end
 
@@ -142,10 +142,10 @@ module UI
     return unless input
     %x{
       #{input}.addEventListener('focus', function(){ #{input}.select(); });
-      #{input}.addEventListener('input', function(){ #{render_suggest(`#{input}.value`)} });
+      #{input}.addEventListener('input', function(){ #{render_suggest(`String(#{input}.value || "")`)} });
       #{input}.addEventListener('blur',  function(){ setTimeout(function(){ #{el("suggest")}.hidden = true; #{render_toolbar} }, 150); });
       #{input}.addEventListener('keydown', function(e){
-        if (e.key === 'Enter') { e.preventDefault(); #{navigate(`#{input}.value`)}; #{input}.blur(); }
+        if (e.key === 'Enter') { e.preventDefault(); #{navigate(`String(#{input}.value || "")`)}; #{input}.blur(); }
         if (e.key === 'Escape') { #{input}.blur(); }
       });
     }
@@ -157,16 +157,17 @@ module UI
   end
 
   def self.click(target)
-    act = `#{target}.dataset.act`
-    tab = `#{target}.dataset.tab`
-    tab = tab.to_s.empty? ? nil : tab.to_i
+    # dataset reads come back as JS undefined when absent — coerce to Ruby strings first.
+    act = `String(#{target}.dataset.act || "")`
+    tab = `String(#{target}.dataset.tab || "")`
+    tab = tab.empty? ? nil : tab.to_i
     @menu_open = false unless act == "menu.toggle"
     case act
     when "menu.toggle"     then @menu_open = !@menu_open
     when "tab.select", "tab.close" then send(act, "tab" => tab)
     when "tab.new"         then send("tab.new")
-    when "open"            then navigate(`#{target}.dataset.url`)
-    when "navigate"        then navigate(`#{target}.dataset.text`)
+    when "open"            then navigate(`String(#{target}.dataset.url || "")`)
+    when "navigate"        then navigate(`String(#{target}.dataset.text || "")`)
     when "nav.back", "nav.forward", "nav.reload", "nav.stop" then send(act, "tab" => @state["current"])
     when "bookmark.toggle" then send("bookmark.toggle")
     when "bookmarks.bar"   then send("bookmarks.bar")
