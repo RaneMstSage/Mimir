@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="92.16" fill="#0f172a"/>
+  <path d="M102.4 225.28 L102.4 102.4 L225.28 102.4" fill="none" stroke="#38bdf8" stroke-width="38.4" stroke-linecap="square"/><path d="M409.6 225.28 L409.6 102.4 L286.72 102.4" fill="none" stroke="#38bdf8" stroke-width="38.4" stroke-linecap="square"/><path d="M102.4 286.72 L102.4 409.6 L225.28 409.6" fill="none" stroke="#38bdf8" stroke-width="38.4" stroke-linecap="square"/><path d="M409.6 286.72 L409.6 409.6 L286.72 409.6" fill="none" stroke="#38bdf8" stroke-width="38.4" stroke-linecap="square"/>
+  <text x="256.0" y="317.44" text-anchor="middle" font-family="DejaVu Sans" font-weight="bold" font-size="215.04" fill="#38bdf8">M</text>
+  <rect x="316" y="362" width="156" height="116" rx="58" fill="#1e293b" stroke="#fbbf24" stroke-width="6"/>
+  <path transform="translate(371 420) scale(1.5)" d="M0 9 C-1 8 -12 2 -12 -4 A6 6 0 0 1 0 -6 A6 6 0 0 1 12 -4 C12 2 1 8 0 9 Z" fill="#fbbf24"/><path transform="translate(417 420) scale(1.5)" d="M0 9 C-1 8 -12 2 -12 -4 A6 6 0 0 1 0 -6 A6 6 0 0 1 12 -4 C12 2 1 8 0 9 Z" fill="#fbbf24"/>
+</svg>
