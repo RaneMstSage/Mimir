@@ -642,6 +642,7 @@ module UI
       "<div class=\"row\"><div class=\"l\"><b>Privacy policy</b><small>Mímir collects no data. Read the full policy.</small></div><button class=\"btn\" data-act=\"open.page\" data-url=\"#{esc(source)}/blob/main/PRIVACY.md\">Open</button></div>"
     "<div class=\"card\"><div class=\"row\"><div class=\"l about\"><b>Mímir #{esc(v["app"])}</b>" \
     "A developer-tools browser for Android, written in Ruby — named for the Norse sage whose counsel reveals hidden knowledge.<br>" \
+    "Built by a developer who wanted to do full-stack work from a tablet after going through The Odin Project, and found there was no real way to inspect a page on Android.<br>" \
     "App logic and DevTools relay: mruby #{esc(v["ruby"])} embedded in the APK. Browser chrome: Ruby compiled with Opal. Engine: Android System WebView (Chromium).<br>Built on a Galaxy Tab in Termux.</div></div>" + support + src + "</div>" \
     "<h2>Open-source licenses</h2><div class=\"card\">" \
     "<div class=\"row\"><div class=\"l\"><b>mruby</b><small>MIT License — mruby developers</small></div></div>" \

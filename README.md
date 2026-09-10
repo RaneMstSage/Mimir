@@ -4,8 +4,11 @@
 
 Mímir is a tabbed browser built on the system WebView (Chromium) with the *real* Chrome DevTools
 attached in-process: Elements, Styles, Console, Network, Sources with breakpoints. No adb, no
-developer options, no desktop. Made for doing web work and [The Odin Project](https://www.theodinproject.com/)
-coursework from a tablet, and it runs happily in Samsung DeX.
+developer options, no desktop. It runs happily in Samsung DeX.
+
+It exists because its developer wanted to do full-stack work from a tablet after going through
+[The Odin Project](https://www.theodinproject.com/), and found there was no real way to inspect a
+page on Android.
 
 Named for the Norse sage whose counsel reveals hidden knowledge.
 
