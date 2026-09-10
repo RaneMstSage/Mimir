@@ -89,6 +89,14 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.main);
+        // Targeting API 35+ draws edge-to-edge; keep our chrome clear of the status/navigation bars and cutouts.
+        final View root = findViewById(android.R.id.content);
+        root.setOnApplyWindowInsetsListener((v, insets) -> {
+            android.graphics.Insets bars = insets.getInsets(android.view.WindowInsets.Type.systemBars() | android.view.WindowInsets.Type.displayCutout());
+            v.setPadding(bars.left, bars.top, bars.right, bars.bottom);
+            return android.view.WindowInsets.CONSUMED;
+        });
+        root.setBackgroundColor(0xFF020617);
 
         chrome = findViewById(R.id.chrome);
         chromeSpace = findViewById(R.id.chrome_space);
