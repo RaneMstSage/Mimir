@@ -1,5 +1,5 @@
 # backtick_javascript: true
-# Browser chrome for Inspect Element, written in Ruby and compiled to JavaScript with Opal.
+# Browser chrome for Mímir, written in Ruby and compiled to JavaScript with Opal.
 # It renders the state snapshot Ruby (mruby, in the APK) sends and turns taps into events.
 require 'opal'
 require 'native'
@@ -135,7 +135,7 @@ module UI
       ["dev.toggle", "Ruby console", "rb"],
       ["devtools.chrome", "Inspect browser UI", "⚙"],
       ["page:settings", "Settings", "›"],
-      ["page:about", "About Inspect Element", ""]
+      ["page:about", "About Mímir", ""]
     ]
     html = rows.map { |r| r == :hr ? "<hr>" : "<button class=\"m\" data-act=\"#{r[0]}\"><span>#{r[1]}</span><small>#{r[2]}</small></button>" }.join
     `#{m}.innerHTML = #{html}; #{m}.hidden = false`
@@ -359,7 +359,7 @@ module UI
 
   def self.about_body
     v = @state["version"] || {}
-    "<div class=\"card\"><div class=\"row\"><div class=\"l about\"><b>Inspect Element #{esc(v["app"])}</b>" \
+    "<div class=\"card\"><div class=\"row\"><div class=\"l about\"><b>Mímir #{esc(v["app"])}</b>" \
     "A developer-tools browser for Android, written in Ruby.<br>App logic and DevTools relay: mruby #{esc(v["ruby"])} embedded in the APK.<br>" \
     "Browser chrome: Ruby compiled with Opal.<br>Engine: Android System WebView (Chromium).<br>Built on the tablet in Termux.</div></div></div>"
   end

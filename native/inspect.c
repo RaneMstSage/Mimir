@@ -27,7 +27,7 @@
 #include <mruby/variable.h>
 #include <mruby/version.h>
 
-#define TAG "InspectRuby"
+#define TAG "MimirRuby"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO,  TAG, __VA_ARGS__)
 #define LOGW(...) __android_log_print(ANDROID_LOG_WARN,  TAG, __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, TAG, __VA_ARGS__)
@@ -60,7 +60,7 @@ static char *q_pop(void) {
 
 /* ---- JNI globals --------------------------------------------------------------------------- */
 static JavaVM *g_vm = NULL;
-static jclass g_runtime_cls = NULL;      /* com.mstsage.inspect.RubyRuntime (global ref) */
+static jclass g_runtime_cls = NULL;      /* com.mstsage.mimir.RubyRuntime (global ref) */
 static jmethodID g_on_command = NULL;    /* static void onCommand(String) */
 static JNIEnv *g_ruby_env = NULL;        /* valid only on the ruby thread, during run() */
 
@@ -196,16 +196,16 @@ JNIEXPORT jint JNI_OnLoad(JavaVM *vm, void *reserved) {
   g_vm = vm;
   JNIEnv *env;
   if ((*vm)->GetEnv(vm, (void **)&env, JNI_VERSION_1_6) != JNI_OK) return -1;
-  jclass native_cls = (*env)->FindClass(env, "com/mstsage/inspect/Native");
+  jclass native_cls = (*env)->FindClass(env, "com/mstsage/mimir/Native");
   if (!native_cls) return -1;
   if ((*env)->RegisterNatives(env, native_cls, methods, sizeof(methods) / sizeof(methods[0])) < 0) return -1;
   if (inspect_crash_register(env, native_cls) < 0) return -1;
-  jclass rt = (*env)->FindClass(env, "com/mstsage/inspect/RubyRuntime");
+  jclass rt = (*env)->FindClass(env, "com/mstsage/mimir/RubyRuntime");
   if (!rt) return -1;
   g_runtime_cls = (jclass)(*env)->NewGlobalRef(env, rt);
   g_on_command = (*env)->GetStaticMethodID(env, rt, "onCommand", "(Ljava/lang/String;)V");
   if (!g_on_command) return -1;
   if (pipe2(wake_pipe, O_CLOEXEC | O_NONBLOCK) != 0) { LOGE("pipe2: %s", strerror(errno)); return -1; }
-  LOGI("libinspect loaded (mruby %s)", MRUBY_VERSION);
+  LOGI("libmimir loaded (mruby %s)", MRUBY_VERSION);
   return JNI_VERSION_1_6;
 }

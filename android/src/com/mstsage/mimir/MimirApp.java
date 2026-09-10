@@ -1,4 +1,4 @@
-package com.mstsage.inspect;
+package com.mstsage.mimir;
 
 import android.app.Application;
 import android.content.ContentValues;
@@ -22,8 +22,8 @@ import java.nio.file.Files;
  * exceptions and native signals are written to files/last_crash.txt and copied to the public
  * Downloads folder (MediaStore, no permission needed on Android 10+), where Termux can read them.
  */
-public class InspectApp extends Application {
-    private static final String TAG = "InspectApp";
+public class MimirApp extends Application {
+    private static final String TAG = "MimirApp";
     public static final String CRASH_FILE = "last_crash.txt";
     public static final String NATIVE_CRASH_FILE = "last_native_crash.txt";
 
@@ -46,7 +46,7 @@ public class InspectApp extends Application {
         // A native crash from a previous run leaves last_native_crash.txt; publish it to Downloads now.
         File nat = new File(getFilesDir(), NATIVE_CRASH_FILE);
         if (nat.exists() && nat.length() > 0) {
-            try { publish(this, "InspectElement-native-crash.txt", new String(Files.readAllBytes(nat.toPath()), StandardCharsets.UTF_8)); } catch (Throwable ignored) {}
+            try { publish(this, "Mimir-native-crash.txt", new String(Files.readAllBytes(nat.toPath()), StandardCharsets.UTF_8)); } catch (Throwable ignored) {}
         }
     }
 
@@ -54,7 +54,7 @@ public class InspectApp extends Application {
         try (FileOutputStream out = new FileOutputStream(new File(ctx.getFilesDir(), name))) {
             out.write(text.getBytes(StandardCharsets.UTF_8));
         } catch (Throwable e) { Log.w(TAG, "write crash file", e); }
-        publish(ctx, "InspectElement-crash.txt", text);
+        publish(ctx, "Mimir-crash.txt", text);
     }
 
     /** Copy text into the public Downloads folder via MediaStore (readable from Termux). */

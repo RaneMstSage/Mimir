@@ -1,4 +1,4 @@
-package com.mstsage.inspect;
+package com.mstsage.mimir;
 
 import android.webkit.JavascriptInterface;
 

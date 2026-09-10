@@ -1,4 +1,4 @@
-package com.mstsage.inspect;
+package com.mstsage.mimir;
 
 import android.content.Context;
 import android.os.Handler;
@@ -52,7 +52,7 @@ public final class RubyRuntime {
                     deliver(fatal("libinspect.so failed to load: " + Native.loadError));
                     return;
                 }
-                Native.initCrash(new java.io.File(app.getFilesDir(), InspectApp.NATIVE_CRASH_FILE).getAbsolutePath());
+                Native.initCrash(new java.io.File(app.getFilesDir(), MimirApp.NATIVE_CRASH_FILE).getAbsolutePath());
                 byte[] mrb = readAsset(app, "app.mrb");
                 JSONObject boot = new JSONObject();
                 boot.put("pid", Process.myPid());
