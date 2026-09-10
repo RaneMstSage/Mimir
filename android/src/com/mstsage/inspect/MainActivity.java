@@ -117,9 +117,21 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
             return true;
         });
 
-        // Boot the Ruby brain (process-wide; survives Activity recreation).
-        ruby.start(this);
+        // Surface any crash from the previous run (we cannot read logcat from Termux).
+        String crash = InspectApp.takeLastCrash(this, InspectApp.CRASH_FILE);
+        String ncrash = InspectApp.takeLastCrash(this, InspectApp.NATIVE_CRASH_FILE);
+        if (crash != null || ncrash != null) {
+            appendRubyLog("=== previous run crashed (copy also in Downloads) ===");
+            if (crash != null) appendRubyLog(crash);
+            if (ncrash != null) appendRubyLog(ncrash);
+            if (rubyPane.getVisibility() != View.VISIBLE) toggleRubyPane();
+            status("Previous run crashed — see Rb pane / Downloads/InspectElement-crash.txt");
+        }
+
+        // Boot the Ruby brain (process-wide; survives Activity recreation). Deferred one frame so
+        // the UI is on screen before native code runs.
         ruby.setListener(this);
+        main.post(() -> ruby.start(this));
 
         // The whole point: turn on WebView's DevTools server for this process.
         WebView.setWebContentsDebuggingEnabled(true);

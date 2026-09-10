@@ -47,6 +47,12 @@ public final class RubyRuntime {
         final Context app = ctx.getApplicationContext();
         thread = new Thread(() -> {
             try {
+                if (Native.loadError != null) {
+                    appendLog("libinspect.so failed to load: " + Native.loadError);
+                    deliver(fatal("libinspect.so failed to load: " + Native.loadError));
+                    return;
+                }
+                Native.initCrash(new java.io.File(app.getFilesDir(), InspectApp.NATIVE_CRASH_FILE).getAbsolutePath());
                 byte[] mrb = readAsset(app, "app.mrb");
                 JSONObject boot = new JSONObject();
                 boot.put("pid", Process.myPid());
@@ -67,7 +73,7 @@ public final class RubyRuntime {
     }
 
     public void post(String json) {
-        if (!started) { Log.w(TAG, "post before start: " + json); return; }
+        if (!started || Native.loadError != null) { Log.w(TAG, "post ignored: " + json); return; }
         Native.post(json);
     }
 

@@ -102,6 +102,7 @@ static mrb_value m_pid(mrb_state *mrb, mrb_value self) { return mrb_fixnum_value
 static mrb_value m_version(mrb_state *mrb, mrb_value self) { return mrb_str_new_cstr(mrb, MRUBY_VERSION); }
 
 void inspect_socket_init(mrb_state *mrb, struct RClass *mod);   /* inspect_socket.c */
+int inspect_crash_register(JNIEnv *env, jclass native_cls);       /* crash.c */
 
 static void define_inspect_module(mrb_state *mrb) {
   struct RClass *m = mrb_define_module(mrb, "Inspect");
@@ -162,9 +163,14 @@ static jint native_run(JNIEnv *env, jclass cls, jbyteArray irep, jstring boot) {
   mrb_value boot_s = mrb_str_new_cstr(mrb, boot_c ? boot_c : "{}");
   if (boot_c) (*env)->ReleaseStringUTFChars(env, boot, boot_c);
 
-  struct RClass *app = mrb_class_get(mrb, "App");
+  if (!mrb_class_defined(mrb, "App")) {
+    LOGE("bytecode did not define App");
+    emit_to_java("{\"cmd\":\"fatal\",\"text\":\"app.mrb did not define App\"}");
+    mrb_close(mrb); g_ruby_env = NULL; return 4;
+  }
+  mrb_value app = mrb_const_get(mrb, mrb_obj_value(mrb->object_class), mrb_intern_lit(mrb, "App"));
   LOGI("mruby %s: starting App.run", MRUBY_VERSION);
-  mrb_funcall(mrb, mrb_obj_value(app), "run", 1, boot_s);
+  mrb_funcall(mrb, app, "run", 1, boot_s);
   int rc = 0;
   if (mrb->exc) { report_exception(mrb, "App.run"); rc = 3; }
   LOGI("App.run returned (%d)", rc);
@@ -193,6 +199,7 @@ JNIEXPORT jint JNI_OnLoad(JavaVM *vm, void *reserved) {
   jclass native_cls = (*env)->FindClass(env, "com/mstsage/inspect/Native");
   if (!native_cls) return -1;
   if ((*env)->RegisterNatives(env, native_cls, methods, sizeof(methods) / sizeof(methods[0])) < 0) return -1;
+  if (inspect_crash_register(env, native_cls) < 0) return -1;
   jclass rt = (*env)->FindClass(env, "com/mstsage/inspect/RubyRuntime");
   if (!rt) return -1;
   g_runtime_cls = (jclass)(*env)->NewGlobalRef(env, rt);
