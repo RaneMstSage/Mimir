@@ -1,3 +1,7 @@
 lib/host.rb
+lib/util.rb
 lib/loop.rb
+lib/http.rb
+lib/devtools.rb
+lib/relay.rb
 app.rb

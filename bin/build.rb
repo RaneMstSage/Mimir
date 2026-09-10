@@ -151,6 +151,21 @@ def gate(so)
   puts "✓ gate: NEEDED=#{needed.join(',')} align=0x#{aligns.min.to_s(16)} exports=JNI_OnLoad"
 end
 
+# Run ruby/test under the built mruby CLI: fake host + app sources + tests concatenated in order.
+def test
+  mruby
+  order = File.read(File.join(RUBY_DIR, 'load_order.txt')).split.map { |f| File.join(RUBY_DIR, f) }
+  tests = Dir[File.join(RUBY_DIR, 'test', '*_test.rb')].sort
+  files = [File.join(RUBY_DIR, 'test', 'fake_host.rb'), File.join(RUBY_DIR, 'test', 'run.rb')] + order + tests
+  bundle = File.join(BUILD, 'test_bundle.rb')
+  FileUtils.mkdir_p(BUILD)
+  summary = "\nputs \"#{'#'}{$tests} tests, #{'#'}{$failures} failures\"\nraise \"tests failed\" if $failures > 0\n"
+  File.write(bundle, files.map { |f| "# ---- #{File.basename(f)}\n" + File.read(f) }.join("\n") + summary)
+  out, st = Open3.capture2e(MRUBY_BIN, bundle)
+  puts out
+  abort '✗ tests failed' unless st.success?
+end
+
 def build
   check_tools
   FileUtils.mkdir_p(BUILD)
@@ -227,9 +242,10 @@ when 'fetch'   then fetch
 when 'mruby'   then mruby
 when 'mrb'     then mrb
 when 'native'  then native
+when 'test'    then test
 when 'build'   then build
 when 'install' then build; install
 when 'run'     then run
 when 'clean'   then Dir[File.join(BUILD, '*')].each { |f| FileUtils.rm_rf(f) unless File.basename(f) == 'mruby' }; puts 'cleaned (kept build/mruby)'
-else abort 'usage: bin/build.rb [fetch|mruby|mrb|native|build|install|run|clean]'
+else abort 'usage: bin/build.rb [fetch|mruby|mrb|native|test|build|install|run|clean]'
 end

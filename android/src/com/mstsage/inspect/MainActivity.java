@@ -65,6 +65,7 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
     private android.widget.ScrollView rubyLogScroll;
     private EditText rubyInput;
     private final RubyRuntime ruby = RubyRuntime.get();
+    private int rubyRelayPort = -1;      // set by Ruby's bridge.ready; Java bridge is only a fallback
 
     private DevToolsBridge bridge;
     private DevToolsClient client;
@@ -133,23 +134,16 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
         ruby.setListener(this);
         main.post(() -> ruby.start(this));
 
-        // The whole point: turn on WebView's DevTools server for this process.
+        // The whole point: turn on WebView's DevTools server for this process. The relay in
+        // front of it is Ruby's (see ruby/lib/relay.rb); DevToolsBridge.java is only a fallback.
         WebView.setWebContentsDebuggingEnabled(true);
-        bridge = new DevToolsBridge(Process.myPid());
-        try {
-            int port = bridge.start();
-            client = new DevToolsClient(port);
-            status("bridge: 127.0.0.1:" + port + " -> @webview_devtools_remote_" + Process.myPid());
-        } catch (Exception e) {
-            status("DevTools bridge failed: " + e);
-        }
 
         findViewById(R.id.btn_back).setOnClickListener(v -> { if (current != null && current.view.canGoBack()) current.view.goBack(); });
         findViewById(R.id.btn_fwd).setOnClickListener(v -> { if (current != null && current.view.canGoForward()) current.view.goForward(); });
         findViewById(R.id.btn_reload).setOnClickListener(v -> { if (current != null) current.view.reload(); });
         findViewById(R.id.btn_newtab).setOnClickListener(v -> newTab(getString(R.string.home_url), true));
         btnDevtools.setOnClickListener(v -> toggleDevtools());
-        btnDevtools.setOnLongClickListener(v -> { reattachDevtools(); return true; });
+        btnDevtools.setOnLongClickListener(v -> { ruby.event("devtools.list"); reattachDevtools(); return true; });
         btnDock.setOnClickListener(v -> { dockRight = !dockRight; applyDock(); });
         btnUa.setOnClickListener(v -> toggleUa());
 
@@ -320,7 +314,7 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
 
     private void toggleDevtools() {
         if (devtoolsOpen) { closeDevtools(); return; }
-        if (client == null) { toast("DevTools bridge not running"); return; }
+        if (rubyRelayPort <= 0 && client == null) { toast("DevTools relay not ready yet"); return; }
         devtoolsOpen = true;
         divider.setVisibility(View.VISIBLE);
         devtoolsContainer.setVisibility(View.VISIBLE);
@@ -369,6 +363,18 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
         if (current != null) attachDevtools(current);
     }
 
+    /** Ruby's relay failed: start the Java relay and its discovery client instead. */
+    private void startJavaBridgeFallback(String reason) {
+        try {
+            if (bridge == null) bridge = new DevToolsBridge(Process.myPid());
+            int port = bridge.start();
+            client = new DevToolsClient(port);
+            status("Ruby relay failed (" + reason + "); Java fallback on 127.0.0.1:" + port);
+        } catch (Exception e) {
+            status("Ruby relay failed (" + reason + ") and Java fallback failed: " + e);
+        }
+    }
+
     private void closeDevtools() {
         devtoolsOpen = false;
         divider.setVisibility(View.GONE);
@@ -386,6 +392,11 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
     private void attachDevtools(final Tab tab) {
         final String url = tab.url;
         status("attaching: " + url);
+        if (rubyRelayPort > 0) {
+            ruby.event("devtools.attach", "url", url);
+            return;
+        }
+        if (client == null) { status("no relay yet (Ruby bridge not ready, no fallback)"); return; }
         new Thread(() -> {
             try {
                 JSONObject target = null;
@@ -483,6 +494,18 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
             case "log": appendRubyLog("[" + cmd.optString("level") + "] " + cmd.optString("text")); break;
             case "console.result": appendRubyLog("=> " + cmd.optString("text")); break;
             case "ready": status("Ruby " + cmd.optString("ruby") + " ready (app " + cmd.optString("app") + ")"); break;
+            case "bridge.ready":
+                rubyRelayPort = cmd.optInt("port", -1);
+                status("Ruby relay on 127.0.0.1:" + rubyRelayPort + " -> @webview_devtools_remote_" + Process.myPid());
+                break;
+            case "bridge.fallback": startJavaBridgeFallback(cmd.optString("reason")); break;
+            case "devtools.open": {
+                String fe = cmd.optString("url");
+                status("target " + cmd.optString("target") + " -> " + fe);
+                if (devtoolsOpen && devtoolsView != null) devtoolsView.loadUrl(fe);
+                break;
+            }
+            case "devtools.error": status("attach failed: " + cmd.optString("text")); break;
             case "fatal":
                 status("RUBY FATAL: " + cmd.optString("text"));
                 appendRubyLog("[FATAL] " + cmd.optString("text"));

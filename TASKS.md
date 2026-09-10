@@ -15,9 +15,9 @@
 - [x] Milestone: Ruby 4.0.0 boots inside the APK on device (Rb pane shows `[info] Ruby 4.0.0 up in pid …`). Console `1+1` still to confirm.
 
 ### Phase 2 — DevTools discovery + relay in Ruby (medium)
-- [ ] `ruby/lib/http.rb`, `lib/devtools.rb` (target scoring + `ws=` rewrite + token; port of DevToolsClient.java), `lib/loop.rb`, `lib/relay.rb`, `native/inspect_socket.c`.
-- [ ] Java: DevTools button → `devtools.toggle` event; executes `devtools.open{url}`; fallback flag to Java bridge.
-- [ ] Verify Elements/Console/Network through the Ruby relay; verify forced fallback path. Commit.
+- [x] `ruby/lib/http.rb`, `lib/devtools.rb`, `lib/util.rb`, `lib/loop.rb`, `lib/relay.rb` (token-guarded, non-blocking, backpressure), `native/inspect_socket.c`; `bin/build.rb test` = 8 tests green under mruby.
+- [x] Java: DevTools button → `devtools.attach{url}` event; executes `devtools.open{url}`/`devtools.error`; `bridge.ready`/`bridge.fallback` → Java DevToolsBridge only on fallback.
+- [~] Verify Elements/Console/Network through the Ruby relay on device; verify forced fallback path.
 
 ### Phase 3 — App logic in Ruby (medium)
 - [ ] `lib/tabs.rb`, `lib/urlnorm.rb`, `lib/settings.rb` (files_dir/settings.json), dispatch in `app.rb`; `MainActivity` → view wiring + `execute(json)` only; delete `DevToolsClient.java`.
