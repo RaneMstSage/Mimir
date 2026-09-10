@@ -303,6 +303,17 @@ module UI
     html = "<header><h1>#{title}</h1>#{search}<button class=\"ib\" data-act=\"page:close\" aria-label=\"Close\">✕</button></header>" \
            "<div class=\"body\">#{nav}<main>#{body}</main></div>"
     `#{pg}.innerHTML = #{html}; #{pg}.hidden = false`
+    debug_page(pg)
+  end
+
+  # Temporary diagnostics: how the overlay actually ended up on screen.
+  def self.debug_page(pg)
+    info = `(function(el){ var r = el.getBoundingClientRect(), cs = getComputedStyle(el);
+      return 'page rect ' + Math.round(r.left) + ',' + Math.round(r.top) + ' ' + Math.round(r.width) + 'x' + Math.round(r.height) +
+        ' display=' + cs.display + ' pos=' + cs.position + ' bg=' + cs.backgroundColor + ' z=' + cs.zIndex + ' vis=' + cs.visibility + ' op=' + cs.opacity +
+        ' hidden=' + el.hidden + ' html=' + el.innerHTML.length + ' viewport ' + window.innerWidth + 'x' + window.innerHeight +
+        ' body ' + document.body.clientWidth + 'x' + document.body.clientHeight + ' dpr=' + window.devicePixelRatio; })(#{pg})`
+    `window.host && window.host.send(#{ { "ev" => "ui.debug", "text" => info }.to_json })`
   end
 
   def self.filter(q) ; @filter = q.to_s ; render_page ; end

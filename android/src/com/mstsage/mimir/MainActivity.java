@@ -243,6 +243,7 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
         chrome.setVerticalScrollBarEnabled(false);
         chrome.addJavascriptInterface(new ChromeBridge(ruby, (ev, o) -> {
             if ("chrome.height".equals(ev)) { main.post(() -> setChromeHeight(o.optInt("dp", 80), o.optBoolean("expand", false))); return true; }
+            if ("ui.debug".equals(ev)) { main.post(() -> { status(o.optString("text")); appendRubyLog("[chrome-ui] " + o.optString("text")); }); return true; }
             if ("ui.error".equals(ev)) {
                 main.post(() -> { status("UI error: " + o.optString("text")); appendRubyLog("[chrome-ui] " + o.optString("text") + "\n    " + o.optString("bt")); });
                 return true;
