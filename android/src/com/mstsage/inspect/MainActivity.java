@@ -269,6 +269,10 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
         ViewGroup.LayoutParams lp = chrome.getLayoutParams();
         int px = expand || dp < 0 ? ViewGroup.LayoutParams.MATCH_PARENT : dp(dp);
         if (lp.height != px) { lp.height = px; chrome.setLayoutParams(lp); }
+        final boolean ex = expand;
+        chrome.post(() -> status("chrome.height dp=" + dp + " expand=" + ex + " → chrome " + chrome.getWidth() + "x" + chrome.getHeight()
+                + " pages " + pages.getWidth() + "x" + pages.getHeight() + " vis=" + pages.getVisibility() + " tabs=" + tabs.size()
+                + " cur=" + currentTab + (tabs.get(currentTab) != null ? " curVis=" + tabs.get(currentTab).getVisibility() + " curH=" + tabs.get(currentTab).getHeight() : "")));
     }
 
     /** Hand Ruby's state snapshot to the Opal chrome. */

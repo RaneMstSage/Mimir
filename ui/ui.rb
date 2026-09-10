@@ -133,6 +133,7 @@ module UI
       ["dock.toggle", "Dock DevTools #{dt["side"] == 'right' ? 'bottom' : 'right'}", ""],
       :hr,
       ["dev.toggle", "Ruby console", "rb"],
+      ["devtools.chrome", "Inspect browser UI", "⚙"],
       ["page:settings", "Settings", "›"],
       ["page:about", "About Inspect Element", ""]
     ]
@@ -210,7 +211,7 @@ module UI
     when "nav.back", "nav.forward", "nav.reload", "nav.stop" then send(act, "tab" => @state["current"])
     when "bookmark.toggle" then send("bookmark.toggle")
     when "bookmarks.bar"   then send("bookmarks.bar")
-    when "ua.toggle", "devtools.toggle", "dock.toggle", "dev.toggle", "settings.open", "about" then send(act)
+    when "ua.toggle", "devtools.toggle", "dock.toggle", "dev.toggle", "devtools.chrome", "settings.open", "about" then send(act)
     end
     render_menu
   end
