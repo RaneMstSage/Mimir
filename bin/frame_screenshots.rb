@@ -4,6 +4,7 @@
 # Each frame: dark gradient, the screenshot scaled to fit with rounded corners, a caption strip.
 require 'fileutils'
 W, H = 1920, 1080
+CROP_BOTTOM = (ENV['CROP_BOTTOM'] || 46).to_i     # source px to drop from the bottom (diagnostic status line)
 INK = '#020617'; NAVY = '#1e293b'; SKY = '#38bdf8'; FG = '#e2e8f0'
 
 out_dir = ARGV.shift or abort 'usage: frame_screenshots.rb out_dir "caption|file" ...'
@@ -18,6 +19,8 @@ ARGV.each_with_index do |spec, i|
   info = `file "#{src}"`
   m = info.match(/(\d{3,5})\s*x\s*(\d{3,5})/)
   sw, sh = m ? [m[1].to_i, m[2].to_i] : [2800, 1752]
+  full_h = sh
+  sh -= CROP_BOTTOM
   # fit into a box leaving room for the caption
   box_w, box_h = W - 160, H - 220
   scale = [box_w.to_f / sw, box_h.to_f / sh].min
@@ -33,7 +36,7 @@ ARGV.each_with_index do |spec, i|
       <rect width="#{W}" height="#{H}" fill="url(#bg)"/>
       <text x="#{W / 2}" y="96" text-anchor="middle" font-family="DejaVu Sans" font-weight="bold" font-size="52" fill="#{FG}">#{caption.gsub('&', '&amp;').gsub('<', '&lt;')}</text>
       <rect x="#{ix}" y="#{iy}" width="#{iw}" height="#{ih}" rx="22" fill="#{NAVY}" filter="url(#shadow)"/>
-      <image x="#{ix}" y="#{iy}" width="#{iw}" height="#{ih}" preserveAspectRatio="none" clip-path="url(#r)" xlink:href="src-#{i + 1}.#{ext}"/>
+      <image x="#{ix}" y="#{iy}" width="#{iw}" height="#{(full_h * scale).round}" preserveAspectRatio="none" clip-path="url(#r)" xlink:href="src-#{i + 1}.#{ext}"/>
       <rect x="#{ix}" y="#{iy}" width="#{iw}" height="#{ih}" rx="22" fill="none" stroke="#{SKY}" stroke-opacity="0.35" stroke-width="2"/>
     </svg>
   SVG
