@@ -59,6 +59,7 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
     private int currentTab = -1;
 
     private WebView chrome;                 // the Opal-rendered browser chrome (ui/)
+    private View chromeSpace;               // reserves the chrome's collapsed height in the column
     private boolean chromeReady = false;
     private String pendingState = null;
     private LinearLayout split;
@@ -89,6 +90,7 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
         setContentView(R.layout.main);
 
         chrome = findViewById(R.id.chrome);
+        chromeSpace = findViewById(R.id.chrome_space);
         split = findViewById(R.id.split);
         pages = findViewById(R.id.pages);
         divider = findViewById(R.id.divider);
@@ -236,11 +238,11 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
         cs.setAllowFileAccess(true);           // file:///android_asset/ui/*
         cs.setSupportZoom(false);
         cs.setTextZoom(100);
-        chrome.setBackgroundColor(0xFF020617);
+        chrome.setBackgroundColor(Color.TRANSPARENT);   // page shows through below the toolbar when expanded
         chrome.setOverScrollMode(View.OVER_SCROLL_NEVER);
         chrome.setVerticalScrollBarEnabled(false);
         chrome.addJavascriptInterface(new ChromeBridge(ruby, (ev, o) -> {
-            if ("chrome.height".equals(ev)) { main.post(() -> setChromeHeight(o.optInt("dp", 80))); return true; }
+            if ("chrome.height".equals(ev)) { main.post(() -> setChromeHeight(o.optInt("dp", 80), o.optBoolean("expand", false))); return true; }
             if ("chrome.ready".equals(ev)) { main.post(() -> { chromeReady = true; if (pendingState != null) pushState(pendingState); }); return false; }
             return false;
         }), "host");
@@ -254,12 +256,19 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
         chrome.loadUrl("file:///android_asset/ui/ui.html");
     }
 
-    private void setChromeHeight(int dp) {
+    /**
+     * dp: collapsed chrome height (tabs + toolbar [+ bookmarks bar]); the spacer in the column
+     * takes this so the page starts below it. expand: a dropdown or full page is open, so the
+     * transparent chrome WebView grows to cover the window and shrinks back afterwards.
+     */
+    private void setChromeHeight(int dp, boolean expand) {
+        if (dp >= 0) {
+            ViewGroup.LayoutParams sp = chromeSpace.getLayoutParams();
+            if (sp.height != dp(dp)) { sp.height = dp(dp); chromeSpace.setLayoutParams(sp); }
+        }
         ViewGroup.LayoutParams lp = chrome.getLayoutParams();
-        int px = dp < 0 ? ViewGroup.LayoutParams.MATCH_PARENT : dp(dp);   // -1: overlay page fills the window
+        int px = expand || dp < 0 ? ViewGroup.LayoutParams.MATCH_PARENT : dp(dp);
         if (lp.height != px) { lp.height = px; chrome.setLayoutParams(lp); }
-        boolean overlay = dp < 0;
-        split.setVisibility(overlay ? View.GONE : View.VISIBLE);
     }
 
     /** Hand Ruby's state snapshot to the Opal chrome. */
