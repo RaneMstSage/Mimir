@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Inspect Element</string>
+    <string name="url_hint">Search or enter address</string>
+    <string name="devtools">DevTools</string>
+    <string name="dock">Dock</string>
+    <string name="new_tab">New tab</string>
+    <string name="home_url">https://www.google.com/</string>
+</resources>

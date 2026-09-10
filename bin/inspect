@@ -1,0 +1,39 @@
+#!/data/data/com.termux/files/usr/bin/bash
+# Inspect Element backend launcher: inspect [start|stop|status|restart|open|fg]
+set -u
+ROOT="$(cd "$(dirname "$(realpath "$0")")/.." && pwd)"
+PORT="${INSPECT_PORT:-8765}"
+RUN="$HOME/.config/inspectelement"; mkdir -p "$RUN"
+PID="$RUN/server.pid"; LOG="$RUN/server.log"
+URL="http://localhost:$PORT/"
+
+running() { pgrep -f "[r]uby app.rb" >/dev/null 2>&1 || curl -fs "$URL/api/status" >/dev/null 2>&1; }
+
+start() {
+  if running; then echo "already running at $URL"; return 0; fi
+  command -v termux-wake-lock >/dev/null && termux-wake-lock 2>/dev/null
+  adb start-server >/dev/null 2>&1
+  ( cd "$ROOT/app" && INSPECT_PORT="$PORT" nohup ruby app.rb >>"$LOG" 2>&1 & echo $! >"$PID" )
+  for _ in $(seq 1 40); do curl -fs "$URL/api/status" >/dev/null 2>&1 && break; sleep 0.25; done
+  echo "started at $URL (log: $LOG)"
+}
+stop() {
+  if running; then
+    pkill -f "[r]uby app.rb" 2>/dev/null; sleep 0.5; echo "stopped"
+  else
+    echo "not running"
+  fi
+  rm -f "$PID"; command -v termux-wake-unlock >/dev/null && termux-wake-unlock 2>/dev/null
+}
+status() { if running; then echo "running (pid $(pgrep -f "[r]uby app.rb" | head -1)) at $URL"; curl -fs "$URL/api/status" 2>/dev/null && echo; else echo "not running"; fi; }
+open_ui() { command -v termux-open-url >/dev/null && termux-open-url "$URL" || echo "$URL"; }
+
+case "${1:-start}" in
+  start)   start ;;
+  stop)    stop ;;
+  restart) stop; start ;;
+  status)  status ;;
+  open)    start; open_ui ;;
+  fg)      cd "$ROOT/app" && exec ruby app.rb ;;
+  *) echo "usage: inspect [start|stop|restart|status|open|fg]"; exit 1 ;;
+esac

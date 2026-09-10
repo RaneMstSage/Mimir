@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="AppTheme" parent="@android:style/Theme.DeviceDefault.NoActionBar">
+        <item name="android:windowBackground">#0f172a</item>
+        <item name="android:statusBarColor">#020617</item>
+        <item name="android:navigationBarColor">#020617</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+    <style name="ToolBtn" parent="@android:style/Widget.DeviceDefault.Button.Borderless">
+        <item name="android:minWidth">44dp</item>
+        <item name="android:minHeight">40dp</item>
+        <item name="android:textColor">#e2e8f0</item>
+        <item name="android:textSize">16sp</item>
+        <item name="android:paddingLeft">8dp</item>
+        <item name="android:paddingRight">8dp</item>
+    </style>
+</resources>
