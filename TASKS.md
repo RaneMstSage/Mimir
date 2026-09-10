@@ -41,15 +41,15 @@ Design target: what a modern desktop browser does, in a compact dark theme.
 ## Phase 6 — Release
 - [x] Release keystore (`tools/release.keystore` + `tools/release.env`, ignored; RSA-4096, 30y, alias mimir) + `bin/build.rb release` → `build/Mimir-release.apk`
 - [x] Play bundle (Ruby pipeline, no billing): `bin/build.rb bundle --play`. **Play bundle with billing: `bin/build.rb gbundle`** → `app/build/outputs/bundle/release/app-release.aab` (R8-shrunk; release-signed; 4.3 MB debug → ~1 MB release)
-- [ ] Store listing assets: icon (adaptive), feature graphic, screenshots (DeX), short/long description, privacy policy (no data collection)
+- [x] Store listing: icon + feature graphic (bin/make_store_art.rb), 6 framed screenshots (bin/frame_screenshots.rb), short/full description, privacy policy URL, content rating (Everyone/PEGI 3), data safety (none), target 18+, tags. Submitted 0.8.2 (802) for review; 0.8.3 (803) + native debug symbols ready as first update.
 - [x] About page: licenses (mruby, mruby-json, Opal MIT; DevTools frontend BSD), version, Donate + Source links (from mimir.config.json)
-- [~] GitHub repo https://github.com/RaneMstSage/Mimir — pushed (clean history, MIT, README). First Release (APK) pending on-device check of Scripts.
+- [x] GitHub repo https://github.com/RaneMstSage/Mimir — clean history, MIT (MstSage Entertainment, LLC), README, PRIVACY.md; Release v0.8.3 with signed APK published
 - [~] Monetization: Play Billing donations (tip jar) — user wants it. Billing 9.1 pulls 50 AAR/JAR deps, so packaging moves to **Gradle 9.7 + AGP 9.4 in Termux** (aapt2 override, hand-made tools/sdk) while Ruby keeps building mruby/native/bytecode/Opal and invokes Gradle (`bin/build.rb gradle <task>`). Proving the toolchain now.
   - [x] Gradle 9.7 + AGP 9.4 assembleDebug succeeds on device (tools/sdk: platform-35 + build-tools 36 with Termux aapt2/d8; aapt placeholder)
   - [x] `Support` interface + Gradle-only `BillingSupport` (connect, queryProductDetails for tip_small/tip_medium/tip_large, launchBillingFlow, consume, leftover-purchase sweep); events to Ruby; R8 keep rules
   - [x] Ruby/Opal: Support page (tiers with Play prices, thank-you, Play-unavailable fallback with external Donate link); menu → Support Mímir ♥
-  - [ ] Play Console: create the three consumable in-app products (user)
-- [ ] Pre-release QA checklist: fresh install, settings/bookmarks/scripts persistence, DevTools attach, DeX resize, rotation, back button, external links, downloads (not yet handled), file chooser (not yet handled)
+  - [ ] Play Console: create the three consumable in-app products tip_small/tip_medium/tip_large + license tester (user, after first bundle processed)
+- [ ] Post-approval: upload 803 + symbols; test tip purchase on internal track; then production rollout. QA checklist: fresh install, settings/bookmarks/scripts persistence, DevTools attach, DeX resize, rotation, back button, external links, downloads (not yet handled), file chooser (not yet handled)
 
 ## Notes
 - Opal gotcha (cost us three 'renders but invisible' bugs): the last expression of a method gets `return`; a backtick with `a; b` there runs only `a`. `bin/build.rb opal` now lints for it; use `UI.show/hide`.
