@@ -88,7 +88,7 @@ App.on("ping") { |ev| Host.emit("pong", "t" => ev["t"]) }
 
 # Find the WebView target for `url` and tell Java to load the DevTools frontend for it.
 module App
-  def self.attach_devtools(url)
+  def self.attach_devtools(url, exclude = DevTools::EXCLUDE)
     port, token = @relay ? [@relay.port, @relay.token] : [@fallback_port, nil]
     unless port
       Host.emit("devtools.error", "text" => "relay not running")
@@ -98,7 +98,7 @@ module App
     list = []
     5.times do
       list = DevTools.targets
-      target = DevTools.find_target(list, url)
+      target = DevTools.find_target(list, url, exclude)
       break if target
       sleep 0.3
     end
@@ -168,6 +168,14 @@ App.on("page.title")    { |ev| b.call.page_title(ev["tab"], ev["title"]) }
 App.on("page.progress") { |ev| b.call.page_progress(ev["tab"], ev["p"]) }
 App.on("devtools.toggle")   { |_| b.call.toggle_devtools }
 App.on("devtools.reattach") { |_| b.call.attach_devtools }
+# Dogfooding: attach DevTools to our own Opal chrome (file:///android_asset/ui/ui.html).
+App.on("devtools.chrome") do |_|
+  br = b.call
+  br.devtools_open = true
+  Host.emit("devtools.dock", "side" => br.settings["dock_side"], "fraction" => br.settings["dock_fraction"])
+  App.attach_devtools("file:///android_asset/ui/ui.html", [DevTools::CDN])
+  br.push_state
+end
 App.on("dock.toggle")   { |_| b.call.toggle_dock }
 App.on("dock.fraction") { |ev| b.call.set_dock_fraction(ev["fraction"]) }
 App.on("ua.toggle")     { |_| b.call.toggle_ua }
