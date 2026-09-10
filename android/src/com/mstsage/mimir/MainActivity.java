@@ -192,6 +192,9 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
                 case "tab.reload": { WebView w = tabs.get(cmd.getInt("tab")); if (w != null) w.reload(); break; }
                 case "ua.set": setDesktopUa(cmd.optBoolean("desktop", true)); break;
                 case "prefs.apply": applyPrefs(cmd); break;
+                case "tab.inject": { WebView w = tabs.get(cmd.getInt("tab")); if (w != null) w.evaluateJavascript(cmd.optString("js"), null); break; }
+                case "block.rules": setBlockRules(cmd.optJSONArray("patterns")); break;
+                case "fetch": fetchForRuby(cmd.optString("url"), cmd.optString("purpose")); break;
                 case "devtools.prefs": devtoolsTheme = cmd.optString("theme", "dark"); devtoolsScreencast = cmd.optBoolean("screencast", false); break;
                 case "data.clear": clearData(cmd); break;
                 case "ui.state": renderState(cmd.getJSONObject("state")); break;
@@ -364,6 +367,57 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
         if (c.optBoolean("storage")) android.webkit.WebStorage.getInstance().deleteAllData();
     }
 
+    // ---- request blocking (Ruby-owned glob patterns) and downloads on Ruby's behalf ----
+    private volatile String[] blockRules = new String[0];
+
+    private void setBlockRules(JSONArray arr) {
+        if (arr == null) { blockRules = new String[0]; return; }
+        String[] r = new String[arr.length()];
+        for (int i = 0; i < arr.length(); i++) r[i] = arr.optString(i);
+        blockRules = r;
+    }
+
+    /** Same glob semantics as ruby/lib/scripts.rb: "*" matches anything. */
+    static boolean glob(String pattern, String url) {
+        if (pattern == null || pattern.isEmpty() || url == null) return false;
+        if (pattern.equals("*") || pattern.equals("<all_urls>")) return true;
+        String[] parts = pattern.split("\\*", -1);
+        if (parts.length == 1) return url.equals(pattern);
+        if (!url.startsWith(parts[0]) || !url.endsWith(parts[parts.length - 1])) return false;
+        int pos = parts[0].length();
+        for (int i = 1; i < parts.length - 1; i++) {
+            if (parts[i].isEmpty()) continue;
+            int at = url.indexOf(parts[i], pos);
+            if (at < 0) return false;
+            pos = at + parts[i].length();
+        }
+        return pos <= url.length() - parts[parts.length - 1].length();
+    }
+
+    private boolean blocked(String url) {
+        for (String p : blockRules) if (glob(p, url)) return true;
+        return false;
+    }
+
+    /** Ruby cannot reach the network itself; download a URL and hand the body back as an event. */
+    private void fetchForRuby(final String url, final String purpose) {
+        new Thread(() -> {
+            String body = null, error = null;
+            try {
+                java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL(url).openConnection();
+                c.setConnectTimeout(10000); c.setReadTimeout(15000); c.setInstanceFollowRedirects(true);
+                c.setRequestProperty("User-Agent", DESKTOP_UA);
+                try (java.io.InputStream in = c.getInputStream()) {
+                    java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+                    byte[] buf = new byte[16384]; int n; long total = 0;
+                    while ((n = in.read(buf)) != -1) { out.write(buf, 0, n); total += n; if (total > 2_000_000) throw new java.io.IOException("file too large (>2 MB)"); }
+                    body = out.toString("UTF-8");
+                }
+            } catch (Exception e) { error = e.toString(); }
+            ruby.event("fetched", "url", url, "purpose", purpose, "body", body == null ? "" : body, "error", error == null ? "" : error);
+        }, "fetch").start();
+    }
+
     private void setDesktopUa(boolean desktop) {
         desktopUa = desktop;
         for (WebView w : tabs.values()) w.getSettings().setUserAgentString(desktop ? DESKTOP_UA : null);
@@ -387,6 +441,12 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
             if ("http".equals(s) || "https".equals(s)) return false;
             try { startActivity(new Intent(Intent.ACTION_VIEW, u)); } catch (Exception ignored) {}
             return true;
+        }
+        @Override public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest req) {
+            if (blockRules.length > 0 && !req.isForMainFrame() && blocked(req.getUrl().toString())) {
+                return new WebResourceResponse("text/plain", "utf-8", 204, "Blocked by Mimir", new HashMap<>(), new java.io.ByteArrayInputStream(new byte[0]));
+            }
+            return null;
         }
     }
 

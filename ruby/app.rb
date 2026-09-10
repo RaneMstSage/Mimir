@@ -3,7 +3,7 @@
 # App.run(boot_json) never returns until a "quit" event arrives. It owns the single event loop:
 # IO.select over the native wake pipe (Java -> Ruby events) plus the DevTools relay sockets.
 module App
-  VERSION = "0.7.0"
+  VERSION = "0.8.0"
 
   @handlers = {}
   @running = false
@@ -13,6 +13,7 @@ module App
   def self.relay   ; @relay ; end
   def self.boot    ; @boot ; end
   def self.browser ; @browser ; end
+  def self.scripts ; @scripts ; end
 
   def self.run(boot_json)
     @boot = JSON.parse(boot_json.to_s) rescue {}
@@ -22,7 +23,8 @@ module App
     Host.emit("ready", "ruby" => Inspect.version, "app" => VERSION)
     @settings = Settings.new(@boot["files_dir"])
     @bookmarks = Bookmarks.new(@boot["files_dir"])
-    @browser = Browser.new(@settings, @bookmarks)
+    @scripts = Scripts.new(@boot["files_dir"])
+    @browser = Browser.new(@settings, @bookmarks, @scripts)
     start_relay
 
     while @running
@@ -140,7 +142,32 @@ App.on("ui.ready") do |ev|
   end
   Host.emit("ua.set", "desktop" => b.call.desktop?)
   b.call.apply_prefs
+  b.call.push_blocks
   b.call.push_state
+end
+
+# ---- user scripts & styles, request blocking ----
+App.on("script.add")    { |ev| App.scripts.add(ev["attrs"] || {}) ; b.call.push_state }
+App.on("script.update") { |ev| App.scripts.update(ev["id"], ev["attrs"] || {}) ; b.call.push_state }
+App.on("script.remove") { |ev| App.scripts.remove(ev["id"]) ; b.call.push_state }
+App.on("script.toggle") { |ev| App.scripts.toggle(ev["id"]) ; b.call.push_state }
+App.on("script.import") { |ev| Host.emit("fetch", "url" => ev["url"].to_s, "purpose" => "script") }   # Java downloads, replies with fetched
+App.on("fetched") do |ev|
+  if ev["purpose"] == "script"
+    if ev["error"].to_s.empty?
+      s = App.scripts.import(ev["url"].to_s, ev["body"].to_s)
+      Host.toast("Imported #{s["name"]}")
+    else
+      Host.toast("Import failed: #{ev["error"]}")
+    end
+    b.call.push_state
+  end
+end
+App.on("blocks.set") { |ev| App.scripts.set_blocks(ev["patterns"]) ; b.call.push_blocks ; b.call.push_state }
+App.on("script.run") do |ev|   # run a script once on the current tab (test button)
+  s = App.scripts.find(ev["id"]) or next
+  js = App.scripts.payload_for([s])
+  Host.emit("tab.inject", "tab" => b.call.current.id, "js" => js) if js && b.call.current
 end
 
 App.on("navigate")      { |ev| b.call.navigate(ev["tab"], ev["text"]) }
