@@ -356,10 +356,14 @@ def gradle(task)
   gradle_manifest
   puts "→ gradle #{task}"
   wrapper = File.join(ROOT, 'gradlew')
-  args = [File.exist?(wrapper) ? wrapper : 'gradle', '--console=plain', '-q']   # wrapper pins Gradle 9.7.1 everywhere
+  unless File.exist?(wrapper) || system('command -v gradle >/dev/null 2>&1')
+    abort '✗ no Gradle: run `git pull` to get the gradlew wrapper (pinned to Gradle 9.7.1)'
+  end
+  args = [File.exist?(wrapper) ? wrapper : 'gradle', '--console=plain']         # wrapper pins Gradle 9.7.1 everywhere
+  args << '-q' unless ENV['VERBOSE']
   args << "-Pandroid.aapt2FromMavenOverride=#{ENV['PREFIX']}/bin/aapt2" if ON_TERMUX   # AGP's aapt2 is x86; use Termux's
   ok = system({ 'JAVA_TOOL_OPTIONS' => '-Dfile.encoding=UTF-8' }, *args, task, chdir: ROOT)
-  abort '✗ gradle failed' unless ok
+  abort '✗ gradle failed (rerun with VERBOSE=1 for the full log)' unless ok
   out = Dir[File.join(ROOT, 'app', 'build', 'outputs', '**', '*.{apk,aab}')].max_by { |f| File.mtime(f) }
   puts "✓ #{out} (#{(File.size(out) / 1024.0).round} KB)" if out
   out
