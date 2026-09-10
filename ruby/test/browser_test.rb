@@ -89,3 +89,38 @@ test "Browser: state carries bookmarks, history and bar flag; find_target skips 
           { "type" => "page", "id" => "p", "url" => "https://s.test/", "description" => '{"visible":true}' }]
   assert_equal "p", DevTools.find_target(list, "https://zzz/")["id"]
 end
+
+test "Settings: set_setting persists, pushes prefs for webview keys, search engine used by navigate" do
+  bm = Bookmarks.new(nil)
+  br = Browser.new(Settings.new(nil), bm)
+  br.new_tab("https://s.test/")
+  Inspect.emitted.clear
+  br.set_setting("javascript", false)
+  prefs = Inspect.emitted.find { |c| c["cmd"] == "prefs.apply" }
+  assert_equal false, prefs["javascript"]
+  br.set_setting("search", "duckduckgo")
+  Inspect.emitted.clear
+  br.navigate(1, "ruby")
+  assert_equal "https://duckduckgo.com/?q=ruby", Inspect.emitted.find { |c| c["cmd"] == "tab.load" }["url"]
+  br.set_setting("nonsense", 1)
+  assert_equal nil, br.settings["nonsense"]
+  st = Inspect.emitted.last["state"]
+  assert_equal "duckduckgo", st["settings"]["search"]
+end
+
+test "History/bookmarks management" do
+  bm = Bookmarks.new(nil)
+  br = Browser.new(Settings.new(nil), bm)
+  bm.visit("https://h1.test/", "H1"); bm.visit("https://h2.test/", "H2")
+  br.history_remove("https://h1.test/")
+  assert_equal ["https://h2.test/"], bm.history.map { |h| h["url"] }
+  bm.toggle("https://b.test/", "B")
+  br.bookmark_rename("https://b.test/", "Better")
+  assert_equal "Better", bm.list[0]["title"]
+  br.bookmark_remove("https://b.test/")
+  assert_equal [], bm.list
+  Inspect.emitted.clear
+  br.clear_data(["history", "cache"])
+  assert_equal [], bm.history
+  assert Inspect.emitted.any? { |c| c["cmd"] == "data.clear" && c["cache"] == true && c["cookies"] == false }
+end

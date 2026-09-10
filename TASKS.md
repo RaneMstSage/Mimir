@@ -29,12 +29,12 @@ Design target: what a modern desktop browser does, in a compact dark theme.
 - [x] Chrome WebView + `ChromeBridge.send(json)` → Ruby events (chrome.height handled locally); `ui.state` → `UI.receive(json)`; chrome excluded from DevTools targets; omnibox keeps focus while typing.
 - [~] Tab strip: favicon + title, × close, + new tab, active/loading state, scroll. (drag order later)
 - [~] Toolbar: back/forward/reload/stop, omnibox + suggestions (history/bookmarks), ★, Desktop/Mobile, DevTools, ⋮ menu (dock in menu). Needs on-device check.
-- [~] **Bookmarks**: star current page, bookmarks bar toggle, stored by Ruby in `bookmarks.json`. Manager (rename/delete/folders) pending.
-- [x] History (recent pages, 200) for omnibox suggestions; stored by Ruby.
+- [~] **Bookmarks**: star, bar toggle, manager page (rename inline, delete, open, search). Folders later.
+- [x] History (200 entries) for omnibox suggestions + History page grouped by day with remove/clear; stored by Ruby.
 - [x] Removed XML toolbar/tab strip; Rb pane stays as a developer drawer (menu → Ruby console).
 
 ### Phase 5 — Settings, scripts, polish
-- [ ] **Settings page** (Ruby-owned, Opal-rendered): search engine, homepage, desktop mode default, JavaScript, cookies/3rd-party, force dark, text zoom, clear browsing data, DevTools defaults (dock side, theme, screencast).
+- [~] **Settings page** (Ruby-owned, Opal overlay, Chrome-style nav + cards): search engine, home page, desktop default, bookmarks bar, force dark, text size, JavaScript, third-party cookies, clear data, DevTools dock/theme/screencast. On-device check pending.
 - [ ] **Scripts & styles** (the extension substitute): per-site user JS/CSS injected at document-start/end, enable/disable, import from URL; request blocking/rewrite rules via `shouldInterceptRequest`.
 - [ ] Offline DevTools frontend; `extractNativeLibs=false` + Ruby zip aligner; release keystore; DeX window behaviour; about page (mruby/Chromium versions).
 

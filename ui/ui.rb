@@ -8,7 +8,9 @@ require 'json'
 module UI
   @state = { "tabs" => [], "bookmarks" => [], "history" => [] }
   @menu_open = false
-  @typing = false
+  @page = nil            # nil | "settings" | "history" | "bookmarks" | "about"
+  @section = nil         # settings section
+  @filter = ""           # history/bookmarks search
 
   # ---- plumbing -----------------------------------------------------------------------------
   def self.send(ev, fields = {})
@@ -18,7 +20,11 @@ module UI
 
   def self.receive(json)
     @state = JSON.parse(`String(#{json})`)
-    render
+    if @page && `document.activeElement && document.activeElement.closest('#page')`
+      render_tabs ; render_toolbar ; render_bookmarks     # don't rebuild the page while typing in it
+    else
+      render
+    end
   end
 
   def self.el(id) ; `document.getElementById(#{id})` ; end
@@ -41,7 +47,8 @@ module UI
     render_tabs
     render_toolbar
     render_bookmarks
-    height = 80 + (@state["bookmarks_bar"] ? 28 : 0)
+    render_page
+    height = @page ? -1 : 80 + (@state["bookmarks_bar"] ? 28 : 0)
     `window.host && window.host.send(#{ { "ev" => "chrome.height", "dp" => height }.to_json })`
   end
 
@@ -108,16 +115,18 @@ module UI
     dt = @state["devtools"] || {}
     rows = [
       ["tab.new", "New tab", "+"],
-      ["bookmarks.bar", "Bookmarks bar", @state["bookmarks_bar"] ? "✓" : ""],
       ["bookmark.toggle", "Bookmark this page", "☆"],
+      ["page:bookmarks", "Bookmarks", "›"],
+      ["page:history", "History", "›"],
+      ["bookmarks.bar", "Show bookmarks bar", @state["bookmarks_bar"] ? "✓" : ""],
       :hr,
       ["ua.toggle", "Request #{@state["desktop"] ? 'mobile' : 'desktop'} site", ""],
       ["devtools.toggle", dt["open"] ? "Close DevTools" : "Open DevTools", "⚙"],
       ["dock.toggle", "Dock DevTools #{dt["side"] == 'right' ? 'bottom' : 'right'}", ""],
       :hr,
       ["dev.toggle", "Ruby console", "rb"],
-      ["settings.open", "Settings", "›"],
-      ["about", "About Inspect Element", ""]
+      ["page:settings", "Settings", "›"],
+      ["page:about", "About Inspect Element", ""]
     ]
     html = rows.map { |r| r == :hr ? "<hr>" : "<button class=\"m\" data-act=\"#{r[0]}\"><span>#{r[1]}</span><small>#{r[2]}</small></button>" }.join
     `#{m}.innerHTML = #{html}; #{m}.hidden = false`
@@ -162,8 +171,27 @@ module UI
     tab = `String(#{target}.dataset.tab || "")`
     tab = tab.empty? ? nil : tab.to_i
     @menu_open = false unless act == "menu.toggle"
+    if act.start_with?("page:")
+      @page = act[5..-1]
+      @page = nil if @page == "close"
+      @section = nil
+      @filter = ""
+      render_menu
+      return render
+    end
+    if act.start_with?("section:")
+      @section = act[8..-1]
+      return render_page
+    end
     case act
     when "menu.toggle"     then @menu_open = !@menu_open
+    when "setting"         then set_setting(target)
+    when "clear.data"      then send("data.clear", "what" => `Array.from(document.querySelectorAll('#page input[data-clear]:checked')).map(function(i){return i.dataset.clear})`)
+    when "history.remove"  then send("history.remove", "url" => `String(#{target}.dataset.url || "")`)
+    when "history.clear"   then send("history.clear")
+    when "bookmark.remove" then send("bookmark.remove", "url" => `String(#{target}.dataset.url || "")`)
+    when "bookmark.rename" then rename_bookmark(target)
+    when "open.page"       then @page = nil; navigate(`String(#{target}.dataset.url || "")`)
     when "tab.select", "tab.close" then send(act, "tab" => tab)
     when "tab.new"         then send("tab.new")
     when "open"            then navigate(`String(#{target}.dataset.url || "")`)
@@ -176,9 +204,162 @@ module UI
     render_menu
   end
 
+  # ---- overlay pages ------------------------------------------------------------------------
+  def self.setting(k) ; (@state["settings"] || {})[k] ; end
+
+  def self.set_setting(target)
+    key = `String(#{target}.dataset.key || "")`
+    kind = `String(#{target}.dataset.kind || "")`
+    value = case kind
+            when "toggle" then !setting(key)
+            when "number" then `Number(#{target}.value)`
+            else `String(#{target}.value || "")`
+            end
+    send("settings.set", "key" => key, "value" => value)
+  end
+
+  def self.rename_bookmark(target)
+    url = `String(#{target}.dataset.url || "")`
+    input = `document.querySelector('#page input[data-rename="' + #{url}.replace(/"/g, '\\"') + '"]')`
+    return if `#{input} == null`
+    send("bookmark.rename", "url" => url, "title" => `String(#{input}.value || "")`)
+  end
+
+  def self.toggle(key, label, desc = "")
+    on = setting(key) ? " on" : ""
+    "<div class=\"row\"><div class=\"l\"><b>#{label}</b>#{desc.empty? ? '' : "<small>#{desc}</small>"}</div><button class=\"sw#{on}\" data-act=\"setting\" data-kind=\"toggle\" data-key=\"#{key}\" aria-label=\"#{label}\"></button></div>"
+  end
+
+  def self.select(key, label, options)
+    cur = setting(key).to_s
+    opts = options.map { |v, t| "<option value=\"#{v}\"#{v == cur ? ' selected' : ''}>#{t}</option>" }.join
+    "<div class=\"row\"><div class=\"l\"><b>#{label}</b></div><select data-key=\"#{key}\" data-kind=\"select\" onchange=\"UI.change(this)\">#{opts}</select></div>"
+  end
+
+  def self.text(key, label, type = "text")
+    "<div class=\"row\"><div class=\"l\"><b>#{label}</b></div><input type=\"#{type}\" value=\"#{esc(setting(key))}\" data-key=\"#{key}\" data-kind=\"#{type}\" onchange=\"UI.change(this)\"></div>"
+  end
+
+  def self.change(el) ; set_setting(el) ; end   # called from onchange in the DOM
+
+  SECTIONS = [["general", "General"], ["appearance", "Appearance"], ["privacy", "Privacy & data"], ["devtools", "Developer tools"]]
+
+  def self.render_page
+    pg = el("page")
+    unless @page
+      `#{pg}.hidden = true` ; return
+    end
+    title = { "settings" => "Settings", "history" => "History", "bookmarks" => "Bookmarks", "about" => "About" }[@page] || @page
+    search = @page == "history" || @page == "bookmarks" ? "<input type=\"search\" placeholder=\"Search #{title.downcase}\" value=\"#{esc(@filter)}\" oninput=\"UI.filter(this.value)\">" : ""
+    nav = ""
+    body = case @page
+           when "settings"
+             @section ||= "general"
+             nav = "<nav>" + SECTIONS.map { |id, t| "<button class=\"#{id == @section ? 'on' : ''}\" data-act=\"section:#{id}\">#{t}</button>" }.join + "</nav>"
+             settings_section(@section)
+           when "history"  then history_body
+           when "bookmarks" then bookmarks_body
+           when "about"    then about_body
+           else "<div class=\"empty\">Unknown page</div>"
+           end
+    html = "<header><h1>#{title}</h1>#{search}<button class=\"ib\" data-act=\"page:close\" aria-label=\"Close\">✕</button></header>" \
+           "<div class=\"body\">#{nav}<main>#{body}</main></div>"
+    `#{pg}.innerHTML = #{html}; #{pg}.hidden = false`
+  end
+
+  def self.filter(q) ; @filter = q.to_s ; render_page ; end
+
+  def self.settings_section(id)
+    case id
+    when "general"
+      "<h2>Search & startup</h2><div class=\"card\">" +
+        select("search", "Search engine", [["google", "Google"], ["duckduckgo", "DuckDuckGo"], ["bing", "Bing"], ["brave", "Brave Search"]]) +
+        text("home", "Home page") +
+        toggle("desktop_ua", "Request desktop site by default", "Sends a desktop user agent to every page") +
+      "</div><h2>Bookmarks</h2><div class=\"card\">" + toggle("bookmarks_bar", "Show bookmarks bar") + "</div>"
+    when "appearance"
+      "<h2>Pages</h2><div class=\"card\">" +
+        toggle("force_dark", "Force dark mode on pages", "Algorithmic darkening for sites without a dark theme") +
+        text("text_zoom", "Text size (%)", "number") +
+      "</div>"
+    when "privacy"
+      "<h2>Content</h2><div class=\"card\">" +
+        toggle("javascript", "JavaScript", "Turning this off breaks most sites; useful for testing") +
+        toggle("cookies_3p", "Allow third-party cookies") +
+      "</div><h2>Clear browsing data</h2><div class=\"card\">" +
+        %w[history cookies cache storage].map { |w| "<label class=\"row\"><div class=\"l\"><b>#{w.capitalize}</b></div><input type=\"checkbox\" data-clear=\"#{w}\" #{w == 'history' || w == 'cache' ? 'checked' : ''}></label>" }.join +
+        "<div class=\"row\"><div class=\"l\"></div><button class=\"btn danger\" data-act=\"clear.data\">Clear selected</button></div>" +
+      "</div>"
+    when "devtools"
+      dt = @state["devtools"] || {}
+      "<h2>DevTools</h2><div class=\"card\">" +
+        select("dock_side", "Dock side", [["right", "Right"], ["bottom", "Bottom"]]) +
+        select("devtools_theme", "Theme", [["dark", "Dark"], ["light", "Light"]]) +
+        toggle("devtools_screencast", "Show screencast preview", "Live thumbnail of the page inside DevTools") +
+        "<div class=\"row\"><div class=\"l\"><b>Engine</b><small>Android System WebView (Chromium). No Chrome extensions; use Scripts instead.</small></div></div>" +
+      "</div>"
+    end
+  end
+
+  def self.matches?(e)
+    q = @filter.downcase
+    q.empty? || e["url"].to_s.downcase.include?(q) || e["title"].to_s.downcase.include?(q)
+  end
+
+  def self.history_body
+    items = (@state["history"] || []).select { |h| matches?(h) }
+    return "<div class=\"empty\">No history#{@filter.empty? ? ' yet' : ' matches'}</div>" if items.empty?
+    days = {}
+    items.each { |h| (days[day_label(h["at"])] ||= []) << h }
+    out = "<div class=\"row\" style=\"padding:0 0 8px\"><div class=\"l\"></div><button class=\"btn\" data-act=\"history.clear\">Clear all history</button></div>"
+    days.each do |d, list|
+      out += "<div class=\"day\">#{d}</div><div class=\"card\">" + list.map { |h|
+        "<div class=\"row link\" data-act=\"open.page\" data-url=\"#{esc(h["url"])}\"><img src=\"#{esc(favicon(h))}\" alt=\"\"><div class=\"l\"><b>#{esc(h["title"])}</b><small>#{esc(h["url"])}</small></div>" \
+        "<button class=\"del\" data-act=\"history.remove\" data-url=\"#{esc(h["url"])}\" aria-label=\"Remove\">✕</button></div>"
+      }.join + "</div>"
+    end
+    out
+  end
+
+  def self.day_label(t)
+    return "Earlier" unless t
+    now = `Math.floor(Date.now()/1000)`
+    d = `new Date(#{t} * 1000)`
+    today = `new Date().toDateString() === #{d}.toDateString()`
+    return "Today" if today
+    return "Yesterday" if now - t.to_i < 172_800
+    `#{d}.toLocaleDateString(undefined, {weekday:'long', month:'short', day:'numeric'})`
+  end
+
+  def self.bookmarks_body
+    items = (@state["bookmarks"] || []).select { |b| matches?(b) }
+    return "<div class=\"empty\">No bookmarks#{@filter.empty? ? ' yet — tap ☆ on a page' : ' match'}</div>" if items.empty?
+    "<div class=\"card\">" + items.map { |b|
+      "<div class=\"row\"><img src=\"#{esc(favicon(b))}\" alt=\"\"><div class=\"l\"><input type=\"text\" value=\"#{esc(b["title"])}\" data-rename=\"#{esc(b["url"])}\" onchange=\"UI.rename_from(this)\"><small>#{esc(b["url"])}</small></div>" \
+      "<button class=\"btn\" data-act=\"open.page\" data-url=\"#{esc(b["url"])}\">Open</button>" \
+      "<button class=\"del\" data-act=\"bookmark.remove\" data-url=\"#{esc(b["url"])}\" aria-label=\"Delete\">✕</button></div>"
+    }.join + "</div>"
+  end
+
+  def self.rename_from(input)
+    send("bookmark.rename", "url" => `String(#{input}.dataset.rename || "")`, "title" => `String(#{input}.value || "")`)
+  end
+
+  def self.about_body
+    v = @state["version"] || {}
+    "<div class=\"card\"><div class=\"row\"><div class=\"l about\"><b>Inspect Element #{esc(v["app"])}</b>" \
+    "A developer-tools browser for Android, written in Ruby.<br>App logic and DevTools relay: mruby #{esc(v["ruby"])} embedded in the APK.<br>" \
+    "Browser chrome: Ruby compiled with Opal.<br>Engine: Android System WebView (Chromium).<br>Built on the tablet in Termux.</div></div></div>"
+  end
+
   def self.boot
     %x{
-      window.UI = { receive: function(s){ #{receive(`s`)} } };
+      window.UI = {
+        receive: function(s){ #{receive(`s`)} },
+        change: function(el){ #{change(`el`)} },
+        filter: function(q){ #{filter(`String(q || "")`)} },
+        rename_from: function(el){ #{rename_from(`el`)} }
+      };
       document.addEventListener('click', function(e){
         var t = e.target.closest('[data-act]');
         if (t) { e.preventDefault(); e.stopPropagation(); #{click(`t`)}; return; }

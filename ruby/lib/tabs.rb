@@ -64,7 +64,7 @@ class Browser
 
   def navigate(id, text)
     t = find(id) || @current or return
-    url = UrlNorm.normalize(text) or return
+    url = UrlNorm.normalize(text, @settings["search"]) or return
     t.url = url
     Host.emit("tab.load", "tab" => t.id, "url" => url)
     push_state
@@ -114,6 +114,44 @@ class Browser
   def toggle_bookmarks_bar
     @settings["bookmarks_bar"] = !@settings["bookmarks_bar"]
     push_state
+  end
+
+  # ---- settings -----------------------------------------------------------------------------
+  def set_setting(key, value)
+    return unless Settings::DEFAULTS.key?(key)
+    value = value.to_i if key == "text_zoom"
+    value = value.to_f if key == "dock_fraction"
+    @settings[key] = value
+    Host.emit("prefs.apply", @settings.webview_prefs) if Settings::WEBVIEW_KEYS.include?(key)
+    Host.emit("ua.set", "desktop" => desktop?) if key == "desktop_ua"
+    Host.emit("devtools.dock", "side" => @settings["dock_side"], "fraction" => @settings["dock_fraction"]) if key == "dock_side" && @devtools_open
+    devtools_prefs if key.start_with?("devtools_")
+    push_state
+  end
+
+  def apply_prefs
+    Host.emit("prefs.apply", @settings.webview_prefs)
+    devtools_prefs
+  end
+
+  def devtools_prefs
+    Host.emit("devtools.prefs", "theme" => @settings["devtools_theme"].to_s, "screencast" => @settings["devtools_screencast"] ? true : false)
+  end
+
+  def clear_data(what)
+    what = Array(what)
+    @bookmarks.history.clear && @bookmarks.save if @bookmarks && what.include?("history")
+    Host.emit("data.clear", "cookies" => what.include?("cookies"), "cache" => what.include?("cache"), "storage" => what.include?("storage"))
+    Host.toast("Cleared #{what.join(', ')}")
+    push_state
+  end
+
+  def history_remove(url) ; @bookmarks.history.reject! { |h| h["url"] == url } ; @bookmarks.save ; push_state ; end
+  def bookmark_remove(url) ; @bookmarks.remove(url) ; push_state ; end
+  def bookmark_rename(url, title)
+    b = @bookmarks.list.find { |x| x["url"] == url } or return
+    b["title"] = title.to_s.empty? ? url : title.to_s
+    @bookmarks.save ; push_state
   end
 
   def page_title(id, title)
@@ -181,8 +219,10 @@ class Browser
       "can_back" => @current ? @current.can_back : false,
       "can_forward" => @current ? @current.can_forward : false,
       "bookmarks" => @bookmarks ? @bookmarks.list : [],
-      "history" => @bookmarks ? @bookmarks.history.first(30) : [],
+      "history" => @bookmarks ? @bookmarks.history : [],
       "bookmarks_bar" => @settings["bookmarks_bar"] ? true : false,
+      "settings" => @settings.to_h,
+      "version" => { "app" => App::VERSION, "ruby" => Inspect.version },
       "devtools" => { "open" => @devtools_open, "side" => @settings["dock_side"], "fraction" => @settings["dock_fraction"] }
     }
   end

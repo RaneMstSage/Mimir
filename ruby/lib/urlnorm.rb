@@ -1,14 +1,20 @@
 # Turn what the user typed in the URL bar into something loadable. No Regexp in this build.
 module UrlNorm
   SEARCH = "https://www.google.com/search?q="
+  ENGINES = {
+    "google"     => "https://www.google.com/search?q=",
+    "duckduckgo" => "https://duckduckgo.com/?q=",
+    "bing"       => "https://www.bing.com/search?q=",
+    "brave"      => "https://search.brave.com/search?q="
+  }
   SAFE = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_.~"
 
-  def self.normalize(text)
+  def self.normalize(text, engine = "google")
     q = text.to_s.strip
     return nil if q.empty?
     return q if scheme?(q)
     return "https://#{q}" if hostish?(q)
-    SEARCH + encode(q)
+    (ENGINES[engine] || SEARCH) + encode(q)
   end
 
   # "http:", "about:", "javascript:" ... — letters/digits/+.- then a colon, and something after it.
