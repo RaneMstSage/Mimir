@@ -41,8 +41,11 @@ frontend sends (which Chromium would otherwise reject) and the real DevTools UI 
 
 ## Install
 
-Download `Mimir-release.apk` from [Releases](https://github.com/RaneMstSage/Mimir/releases) and open it
-with your file manager. Play Store listing: coming.
+**Google Play:** https://play.google.com/store/apps/details?id=com.mstsage.mimir
+
+**Direct download:** `Mimir-<version>.apk` from [Releases](https://github.com/RaneMstSage/Mimir/releases);
+open it with your file manager. The GitHub build is identical except that its Support page links to
+PayPal instead of Google Play tips.
 
 ## Build from source (Termux, Android 10+)
 
