@@ -1,0 +1,11 @@
+// Gradle takes the Java/resources/packaging stages so Play Billing (and other AAR
+// dependencies) resolve normally. Ruby (bin/build.rb) still builds mruby, the native
+// library, the Ruby bytecode and the Opal UI, then invokes Gradle.
+pluginManagement {
+    repositories { google(); mavenCentral(); gradlePluginPortal() }
+}
+dependencyResolutionManagement {
+    repositories { google(); mavenCentral() }
+}
+rootProject.name = "Mimir"
+include(":app")

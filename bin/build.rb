@@ -308,6 +308,27 @@ def bundle
   puts "✓ Play bundle #{OUT_AAB} (#{(File.size(OUT_AAB) / 1024.0).round} KB), universal APK from it verifies — upload the .aab in Play Console"
 end
 
+# Gradle path (needed for AAR dependencies such as Play Billing): Ruby builds mruby, the native
+# library, bytecode and Opal UI, then Gradle compiles Java + resources and packages the APK/AAB.
+def gradle_manifest
+  m = File.read(File.join(ANDROID, 'AndroidManifest.xml'))
+  m = m.sub(/\s*package="[^"]*"/, '')      # AGP takes the namespace from build.gradle
+  FileUtils.mkdir_p(File.join(BUILD, 'gradle'))
+  File.write(File.join(BUILD, 'gradle', 'AndroidManifest.xml'), m)
+end
+
+def gradle(task)
+  gen_buildinfo
+  mrb; native; opal
+  gradle_manifest
+  puts "→ gradle #{task}"
+  ok = system({ 'JAVA_TOOL_OPTIONS' => '-Dfile.encoding=UTF-8' }, 'gradle', '--console=plain', '-q', task, chdir: ROOT)
+  abort '✗ gradle failed' unless ok
+  out = Dir[File.join(ROOT, 'app', 'build', 'outputs', '**', '*.{apk,aab}')].max_by { |f| File.mtime(f) }
+  puts "✓ #{out} (#{(File.size(out) / 1024.0).round} KB)" if out
+  out
+end
+
 def build
   gen_buildinfo
   check_tools
@@ -390,9 +411,10 @@ when 'test'    then test
 when 'opal'    then opal
 when 'build'   then build
 when 'release' then release
+when 'gradle'  then gradle(ARGV[1] || ':app:assembleDebug')
 when 'bundle'  then build; bundle
 when 'install' then build; install
 when 'run'     then run
 when 'clean'   then Dir[File.join(BUILD, '*')].each { |f| FileUtils.rm_rf(f) unless File.basename(f) == 'mruby' }; puts 'cleaned (kept build/mruby)'
-else abort 'usage: bin/build.rb [fetch|mruby|mrb|native|opal|test|build|release|bundle|install|run|clean] [--play]'
+else abort 'usage: bin/build.rb [fetch|mruby|mrb|native|opal|test|build|release|bundle|gradle <task>|install|run|clean] [--play]'
 end
