@@ -258,6 +258,7 @@ def gen_buildinfo
         static final String VERSION = "#{cfg['version'] || '0.0.0'}";
         static final String DONATE_URL = "#{donate}";
         static final String SOURCE_URL = "#{cfg['source_url'].to_s}";
+        static final String PLAY_PUBLIC_KEY = "#{cfg['play_public_key'].to_s}";
         static final boolean PLAY_BUILD = #{play};
         private BuildInfo() {}
     }
