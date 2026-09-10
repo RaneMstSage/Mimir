@@ -9,10 +9,10 @@
 - [x] Link a hello `.so` with the production flags; `readelf` gate passes (NEEDED = liblog/libm/libdl/libc, no RUNPATH after patchelf, LOAD align 0x4000, only JNI_OnLoad exported; 24 KB).
 
 ### Phase 1 — Ruby executes inside the APK (medium)
-- [ ] `native/inspect.c`, `Native.java`, `RubyRuntime.java`, `ruby/app.rb` (boot → `toast "Hello from mruby <version>"`).
-- [ ] `bin/build.rb` stages `mrb` (mrbc, depends on mrbc mtime), `native` (clang link flags below, patchelf, strip, readelf gate), stage `lib/arm64-v8a/libinspect.so` + `assets/app.mrb`; manifest `extractNativeLibs="true"` explicit.
-- [ ] In-app **log pane + Ruby console** (`mruby-eval`) — our only debugging window without logcat.
-- [ ] Milestone: toast shows, log pane shows Ruby output, console evaluates `1+1`. Commit.
+- [x] `native/inspect.c` (+ `inspect_socket.c`), `Native.java`, `RubyRuntime.java`, `ruby/app.rb` + `lib/host.rb`, `lib/loop.rb` (boot → toast).
+- [x] `bin/build.rb` stages `mrb`, `native` (clang, patchelf, strip, gate before finalizing), staging of `lib/arm64-v8a/libinspect.so` (1.6 MB) + `assets/app.mrb`; manifest `extractNativeLibs="true"`; APK 501 KB.
+- [x] In-app log pane + Ruby console (Rb button; `console.eval` → `eval` via mruby-eval).
+- [~] Milestone: toast shows, log pane shows Ruby output, console evaluates `1+1` — installer opened, awaiting user test.
 
 ### Phase 2 — DevTools discovery + relay in Ruby (medium)
 - [ ] `ruby/lib/http.rb`, `lib/devtools.rb` (target scoring + `ws=` rewrite + token; port of DevToolsClient.java), `lib/loop.rb`, `lib/relay.rb`, `native/inspect_socket.c`.

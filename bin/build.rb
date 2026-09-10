@@ -127,8 +127,10 @@ def native
      '-Wl,--exclude-libs,ALL', '-Wl,--gc-sections',
      '-o', SO_UNSTRIPPED, *srcs, MRUBY_LIB, '-llog', '-lm')
   sh('patchelf', '--remove-rpath', SO_UNSTRIPPED)
-  sh('llvm-strip', '--strip-unneeded', '-o', SO_OUT, SO_UNSTRIPPED)
-  gate(SO_OUT)
+  tmp = SO_OUT + '.tmp'
+  sh('llvm-strip', '--strip-unneeded', '-o', tmp, SO_UNSTRIPPED)
+  gate(tmp)                       # only a library that passes the gate becomes libinspect.so
+  FileUtils.mv(tmp, SO_OUT)
   puts "✓ #{SO_OUT} (#{(File.size(SO_OUT) / 1024).round} KB; unstripped kept for symbolizing)"
 end
 
