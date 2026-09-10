@@ -121,6 +121,7 @@ def native
     return
   end
   FileUtils.mkdir_p(SO_DIR)
+  Dir[File.join(SO_DIR, '*.so')].each { |f| FileUtils.rm_f(f) }   # never ship a stale/renamed library
   sh('clang', '-shared', '-fPIC', '-O2', '-g', '-std=gnu11', '-fvisibility=hidden',
      '-ffunction-sections', '-fdata-sections', '-Wall',
      '-DMRB_UTF8_STRING', '-DMRB_INT64', '-DMRB_USE_DEBUG_HOOK', '-DMRB_DEBUG',
@@ -266,7 +267,7 @@ def install
   abort 'run termux-setup-storage first (no ~/storage/downloads)' unless Dir.exist?(dl)
   FileUtils.cp(OUT_APK, File.join(dl, 'Mimir.apk'))
   system('am', 'start', '-a', 'android.intent.action.VIEW_DOWNLOADS', out: File::NULL, err: File::NULL)
-  puts 'APK copied to Downloads/InspectElement.apk — tap it in the file manager to install.'
+  puts 'APK copied to Downloads/Mimir.apk — tap it in the file manager to install.'
 end
 
 def run
