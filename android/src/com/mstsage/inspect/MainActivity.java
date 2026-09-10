@@ -343,7 +343,18 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
                 @Override public void onReceivedHttpError(WebView v, WebResourceRequest r, android.webkit.WebResourceResponse resp) {
                     if (r.isForMainFrame()) status("frontend HTTP " + resp.getStatusCode() + " " + r.getUrl());
                 }
-                @Override public void onPageFinished(WebView v, String u) { status("frontend loaded: " + u); }
+                @Override public void onPageFinished(WebView v, String u) {
+                    status("frontend loaded: " + u);
+                    // The remote-target frontend enables its screencast preview by default; the real page
+                    // is right next to it, so persist it off (DevTools settings live in localStorage) and
+                    // reload once. Also default to the dark theme.
+                    v.evaluateJavascript("(function(){try{var r='ok';"
+                            + "if(localStorage.getItem('screencastEnabled')!=='false'){localStorage.setItem('screencastEnabled','false');r='reload';}"
+                            + "if(!localStorage.getItem('uiTheme')){localStorage.setItem('uiTheme','\"dark\"');r='reload';}"
+                            + "return r;}catch(e){return 'err:'+e;}})()", res -> {
+                        if (res != null && res.contains("reload")) v.reload();
+                    });
+                }
             });
             devtoolsView.setWebChromeClient(new WebChromeClient() {
                 @Override public boolean onConsoleMessage(android.webkit.ConsoleMessage m) {
