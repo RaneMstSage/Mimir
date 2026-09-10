@@ -48,7 +48,7 @@
             android:textSize="14sp"
             android:selectAllOnFocus="true" />
         <Button android:id="@+id/btn_newtab" style="@style/ToolBtn" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="+" />
-        <Button android:id="@+id/btn_ua" style="@style/ToolBtn" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="🖥" />
+        <Button android:id="@+id/btn_ua" style="@style/ToolBtn" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Desktop ✓" android:textSize="13sp" />
         <Button android:id="@+id/btn_dock" style="@style/ToolBtn" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="⇲" />
         <Button android:id="@+id/btn_ruby" style="@style/ToolBtn" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Rb" android:textColor="#f472b6" />
         <Button android:id="@+id/btn_devtools" style="@style/ToolBtn" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="⚙ DevTools" android:textColor="#38bdf8" />

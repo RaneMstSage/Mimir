@@ -226,6 +226,7 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
             o.chip.setTextColor(on ? 0xFFe2e8f0 : 0xFF94a3b8);
         }
         urlBar.setText(t.url);
+        status("tab " + (tabs.indexOf(t) + 1) + "/" + tabs.size() + ": " + t.url);
         tabScroll.post(() -> tabScroll.smoothScrollTo(t.chip.getLeft() - dp(40), 0));
         if (devtoolsOpen) attachDevtools(t);
     }
@@ -264,9 +265,9 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
         for (Tab t : tabs) {
             t.view.getSettings().setUserAgentString(desktopUa ? DESKTOP_UA : null);
         }
-        btnUa.setText(desktopUa ? "🖥" : "📱");
+        btnUa.setText(desktopUa ? "Desktop ✓" : "Mobile ✓");
         if (current != null) current.view.reload();
-        toast(desktopUa ? "Desktop site" : "Mobile site");
+        toast(desktopUa ? "Requesting desktop site" : "Requesting mobile site");
     }
 
     private void navigate(String text) {
