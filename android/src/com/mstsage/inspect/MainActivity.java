@@ -92,7 +92,8 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
         divider = findViewById(R.id.divider);
         devtoolsContainer = findViewById(R.id.devtools_container);
         statusView = findViewById(R.id.status);
-        statusView.setOnLongClickListener(v -> { statusView.setVisibility(View.GONE); return true; });
+        statusView.setOnLongClickListener(v -> { toggleRubyPane(); return true; });   // escape hatch if the chrome fails
+        statusView.setOnClickListener(v -> statusView.setVisibility(View.GONE));
         rubyPane = findViewById(R.id.ruby_pane);
         rubyLog = findViewById(R.id.ruby_log);
         rubyLogScroll = findViewById(R.id.ruby_log_scroll);
