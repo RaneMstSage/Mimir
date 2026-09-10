@@ -10,3 +10,6 @@ tools/debug.keystore
 # editor / os
 *.swp
 .DS_Store
+# vendored sources (bin/build.rb fetch)
+vendor/mruby/
+vendor/mruby-json/
