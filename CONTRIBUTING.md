@@ -23,24 +23,22 @@ to Ruby and give Java a dumb command to execute.
 
 Termux on Android 10+ (arm64) is the supported environment; the project is developed and tested on-device.
 
-**Android Studio / desktop:** the Gradle module opens and compiles the Java, but Gradle only packages
-what the Ruby pipeline produces (`libmimir.so`, `app.mrb`, `assets/ui/`). The native stage currently
-assumes a compiler that emits Android arm64 binaries, which Termux's clang does and a desktop clang
-does not. A desktop build needs the Android NDK: mruby's `MRuby::CrossBuild` with `toolchain :android`
-for `libmruby.a`, and the NDK clang for `native/*.c`. `bin/build.rb` doesn't do that yet; see the
-"desktop build path" issue if you want to take it on. The `mrb` and `opal` stages already run anywhere.
+**PC (Linux, macOS, WSL) with the Android NDK.** The same commands work; the native stage cross-compiles
+when it sees the NDK. Untested on Windows proper.
 
-    pkg install clang make aapt2 d8 apksigner zip patchelf openjdk-21 nodejs gradle librsvg
-    gem install opal                                  # needs Ruby 3.x
-    ruby bin/build.rb fetch                           # vendors mruby 4.0.0 + mruby-json
-    ruby bin/build.rb mruby                           # builds libmruby with clang (once, a few minutes)
-    ruby bin/build.rb test                            # Ruby tests under the built mruby
-    ruby bin/build.rb install                         # debug APK without billing -> ~/storage/downloads
-    ruby bin/build.rb ginstall                        # debug APK with Play Billing, via Gradle
+    # Android Studio → SDK Manager → SDK Tools: install "NDK (Side by side)" and "Android SDK Build-Tools"
+    export ANDROID_HOME=~/Android/Sdk                       # or wherever Studio put it
+    export ANDROID_NDK_HOME=$ANDROID_HOME/ndk/<version>
+    # Ruby 3.x, Node 18+, and: gem install opal
+    ruby bin/build.rb fetch
+    ruby bin/build.rb mruby          # host build (mrbc, mruby) + android-arm64 cross build (libmruby.a)
+    ruby bin/build.rb test
+    ruby bin/build.rb gbuild         # Gradle debug APK in app/build/outputs/apk/debug/
 
-The Ruby pipeline needs `tools/android.jar` (from the Android platform zip) and `tools/debug.keystore`.
-The Gradle path also needs `tools/sdk/` laid out as `platforms/android-36` and `build-tools/36.0.0`
-with Termux's `aapt2` and `d8` symlinked over the x86 binaries. See `PLAN.md` for the full story.
+`mruby` uses mruby's own NDK toolchain support; `native` links with the NDK's clang and checks the result
+with `llvm-readelf`. Gradle finds the SDK via `ANDROID_HOME`. The pure-Ruby packaging path (`build`,
+`install`, `bundle`) is Termux-oriented; on a PC use the `g*` Gradle commands. Android Studio can open the
+project directly once `ruby bin/build.rb mrb native opal` has produced the staged artifacts.
 
 Android 14+ won't let Termux launch the package installer, so `install` copies the APK to Downloads;
 open it from your file manager.
