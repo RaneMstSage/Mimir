@@ -63,4 +63,4 @@ Mímir is free and open source. If it earns a place in your workflow, the About 
 
 ## License
 
-See `LICENSE`.
+MIT License. Copyright (c) 2026 MstSage Entertainment, LLC. See [LICENSE](LICENSE) for the full text.
