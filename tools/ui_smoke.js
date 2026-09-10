@@ -23,6 +23,6 @@ try {
   const sbtn = { dataset: { act: 'page:settings' }, closest(sel){ return sel === '[data-act]' ? sbtn : null; } };
   (docListeners.click || []).forEach(f => f({ target: sbtn, preventDefault(){}, stopPropagation(){} }));
   if (!els.page.innerHTML.includes('Search engine') || !els.page.innerHTML.includes('<nav>')) throw new Error('settings page did not render: ' + els.page.innerHTML.slice(0, 200));
-  if (!sent.some(e => e.ev === 'chrome.height' && e.dp === -1)) throw new Error('overlay did not request full height');
+  if (!sent.some(e => e.ev === 'chrome.height' && e.expand === true)) throw new Error('overlay did not request expansion');
   console.log('ui smoke ok (render + tap + settings page)');
 } catch (e) { console.log('UI RUNTIME ERROR:', e && (e.stack || e)); process.exit(1); }
