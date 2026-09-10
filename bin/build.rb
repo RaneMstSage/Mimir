@@ -191,6 +191,12 @@ def opal
   # Boot the bundle against a stub DOM: catches Opal runtime errors (e.g. mutable-string calls).
   out, st3 = Open3.capture2e('node', File.join(ROOT, 'tools', 'ui_smoke.js'), out_js)
   abort "✗ ui.js failed to boot:\n#{out}" unless st3.success?
+  # Real-DOM run (jsdom) when available: boot, receive state, open pages, click through.
+  if Dir.exist?(File.join(ROOT, 'tools', 'node_modules', 'jsdom'))
+    out, st4 = Open3.capture2e('node', File.join(ROOT, 'tools', 'ui_jsdom.js'), UI_OUT)
+    abort "✗ ui.js failed in jsdom:\n#{out}" unless st4.success?
+    puts out.lines.last.to_s.strip
+  end
   %w[ui.html ui.css].each { |f| FileUtils.cp(File.join(UI_DIR, f), UI_OUT) }
   puts "✓ #{out_js} (#{(File.size(out_js) / 1024).round} KB incl. Opal runtime)"
 end
