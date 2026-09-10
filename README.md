@@ -1,19 +1,17 @@
-# Inspect Element (Termux + Ruby)
+# Inspect Element
 
-Desktop-style Chrome DevTools for Chrome tabs on this tablet. See PLAN.md for the design
-and TASKS.md for progress.
+A standalone Android developer-tools browser for the Galaxy Tab S10+ (DeX-friendly, no adb),
+developed entirely on the tablet in Termux. Ruby runs the app logic and DevTools relay inside the
+APK (mruby via JNI); the UI is Ruby compiled with Opal; Java is thin view glue. The DevTools pane
+is the real Chrome DevTools frontend attached in-process to the app's own WebView.
 
-## Run
-    inspect open      # start backend (if needed) and open the UI in the browser
-    inspect status    # health + JSON status
-    inspect stop
+See PLAN.md for architecture and research, TASKS.md for progress.
 
-Backend: Sinatra on http://localhost:8765 (change with INSPECT_PORT).
-State (paired flag, last adb port) lives in ~/.config/inspectelement/.
+## Build (Termux)
+    ruby bin/build.rb fetch     # once: vendor mruby 4.0.0 + mruby-json
+    ruby bin/build.rb mruby     # once: build libmruby.a / mrbc / mruby with Termux clang
+    ruby bin/build.rb install   # build APK and hand it to the system installer
+    ruby bin/build.rb test      # run ruby/ tests under the built mruby CLI
 
-## First-time setup
-1. Developer options → USB debugging ON, Wireless debugging ON.
-2. Open http://localhost:8765/setup and Settings side by side (split-screen).
-3. Wireless debugging → "Pair device with pairing code" → enter port + code in the app.
-4. Tap "Auto connect". The Tabs page then lists Chrome tabs with Inspect buttons.
-5. Browser menu → Add to Home screen to install as an app.
+Toolchain: pkg install aapt2 d8 apksigner zip clang make patchelf; OpenJDK 21 (javac);
+tools/android.jar from the platform-35 zip; tools/debug.keystore via keytool (see PLAN.md).
