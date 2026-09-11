@@ -338,9 +338,25 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
 
     private void installContextMenu(final WebView w, final int id) {
         w.setOnTouchListener((v, ev) -> { lastPointer[0] = ev.getX(); lastPointer[1] = ev.getY(); return false; });
-        w.setOnGenericMotionListener((v, ev) -> { lastPointer[0] = ev.getX(); lastPointer[1] = ev.getY(); return false; });
-        w.setOnLongClickListener(v -> { contextMenu(w, id); return true; });          // touch long-press
-        w.setOnContextClickListener(v -> { contextMenu(w, id); return true; });       // mouse right-click (API 23+)
+        // Mouse: Chromium's WebView consumes button events itself, so OnContextClickListener may
+        // never fire. Catch the secondary (right) button press in the raw motion stream instead.
+        w.setOnGenericMotionListener((v, ev) -> {
+            lastPointer[0] = ev.getX(); lastPointer[1] = ev.getY();
+            if (ev.getActionMasked() == MotionEvent.ACTION_BUTTON_PRESS
+                    && (ev.getActionButton() == MotionEvent.BUTTON_SECONDARY || ev.getActionButton() == MotionEvent.BUTTON_STYLUS_PRIMARY)) {
+                contextMenu(w, id);
+                return true;
+            }
+            return false;
+        });
+        w.setOnContextClickListener(v -> { contextMenu(w, id); return true; });   // fallback path (some devices)
+        // Touch: long-press opens our menu on links and images only; on text, let the WebView select.
+        w.setOnLongClickListener(v -> {
+            int t = w.getHitTestResult().getType();
+            if (t == WebView.HitTestResult.SRC_ANCHOR_TYPE || t == WebView.HitTestResult.SRC_IMAGE_ANCHOR_TYPE
+                    || t == WebView.HitTestResult.IMAGE_TYPE) { contextMenu(w, id); return true; }
+            return false;
+        });
     }
 
     private void contextMenu(WebView w, int id) {
