@@ -176,9 +176,7 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
     public boolean dispatchKeyEvent(KeyEvent event) {
         int kc = event.getKeyCode();
         boolean mouse = (event.getSource() & android.view.InputDevice.SOURCE_MOUSE) == android.view.InputDevice.SOURCE_MOUSE;
-        if (event.getAction() == KeyEvent.ACTION_DOWN && (kc == KeyEvent.KEYCODE_BACK || kc == KeyEvent.KEYCODE_FORWARD)) {
-            ruby.appendLog("[key] " + KeyEvent.keyCodeToString(kc) + " src=" + event.getSource() + " mouse=" + mouse);
-        }
+        ruby.appendLog("[key] " + KeyEvent.keyCodeToString(kc) + " act=" + event.getAction() + " src=" + event.getSource() + " rc=" + event.getRepeatCount());
         if (event.getAction() == KeyEvent.ACTION_DOWN) {
             WebView w = tabs.get(currentTab);
             if (kc == KeyEvent.KEYCODE_FORWARD && w != null) { if (w.canGoForward()) w.goForward(); return true; }
@@ -205,8 +203,10 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
 
     /** Single back handler for the mouse back button, the gesture, and older key-based back.
      *  Debounced: some devices deliver one press through several channels at once. */
+    private int backCount = 0;
     private void handleBack() {
         long now = android.os.SystemClock.uptimeMillis();
+        ruby.appendLog("[back] call #" + (++backCount) + " dt=" + (now - lastBackMs));
         if (now - lastBackMs < 350) return;
         lastBackMs = now;
         WebView w = tabs.get(currentTab);
