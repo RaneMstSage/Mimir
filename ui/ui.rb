@@ -13,6 +13,7 @@ module UI
   @bm_pending = nil       # url just starred; popup opens once Ruby's state confirms it
   @mgr_folder = "bar"     # bookmarks manager: current folder id
   @script_id = nil        # scripts page: script being edited (nil = list)
+  @sel = -1               # highlighted omnibox suggestion (keyboard navigation)
   @menu_open = false
   @page = nil            # nil | "settings" | "history" | "bookmarks" | "about"
   @section = nil         # settings section
@@ -293,6 +294,7 @@ module UI
     end
     pool = (flat.map { |b| b.merge("k" => "★") } + (@state["history"] || []).map { |h| h.merge("k" => "⌚") })
     hits = pool.select { |e| e["url"].to_s.downcase.include?(q) || e["title"].to_s.downcase.include?(q) }.first(6)
+    @sel = -1
     html = hits.map { |e| "<button class=\"s\" data-act=\"open\" data-url=\"#{esc(e["url"])}\"><span class=\"k\">#{e["k"]}</span><span>#{esc(e["title"].to_s[0, 40])}</span><span class=\"u\">#{esc(e["url"])}</span></button>" }.join
     html += "<button class=\"s\" data-act=\"navigate\" data-text=\"#{esc(q)}\"><span class=\"k\">🔍</span><span>Search for “#{esc(q)}”</span></button>"
     show(box, html)
@@ -308,8 +310,9 @@ module UI
       #{input}.addEventListener('input', function(){ #{render_suggest(`String(#{input}.value || "")`)} });
       #{input}.addEventListener('blur',  function(){ setTimeout(function(){ #{el("suggest")}.hidden = true; #{render_toolbar}; #{sync_height} }, 150); });
       #{input}.addEventListener('keydown', function(e){
-        if (e.key === 'Enter') { e.preventDefault(); #{navigate(`String(#{input}.value || "")`)}; #{input}.blur(); }
-        if (e.key === 'Escape') { #{input}.blur(); }
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); #{move_selection(`e.key === 'ArrowDown' ? 1 : -1`)}; return; }
+        if (e.key === 'Enter') { e.preventDefault(); #{accept_selection(`String(#{input}.value || "")`)}; #{input}.blur(); }
+        if (e.key === 'Escape') { #{el("suggest")}.hidden = true; #{input}.blur(); }
       });
     }
   end
@@ -318,6 +321,35 @@ module UI
     send("navigate", "tab" => @state["current"], "text" => text)
     `#{el("suggest")}.hidden = true`
     sync_height
+  end
+
+  # ---- omnibox keyboard navigation ----
+  def self.suggestion_rows ; `Array.from(#{el("suggest")}.querySelectorAll('.s'))` ; end
+
+  def self.move_selection(delta)
+    rows = suggestion_rows
+    n = `#{rows}.length`
+    return if n == 0 || `#{el("suggest")}.hidden`
+    @sel = (@sel + delta) % n
+    @sel += n if @sel < 0
+    `#{rows}.forEach(function(r, i){ r.classList.toggle('sel', i === #{@sel}) })`
+    `#{rows}[#{@sel}].scrollIntoView({block:'nearest'})`
+    # preview the highlighted URL in the field, like Chrome
+    row = `#{rows}[#{@sel}]`
+    url = `String(#{row}.dataset.url || "")`
+    `#{el("url")}.value = #{url}` unless url.empty?
+    nil
+  end
+
+  def self.accept_selection(typed)
+    rows = suggestion_rows
+    if @sel >= 0 && @sel < `#{rows}.length`
+      row = `#{rows}[#{@sel}]`
+      url = `String(#{row}.dataset.url || "")`
+      text = `String(#{row}.dataset.text || "")`
+      return navigate(url.empty? ? text : url)
+    end
+    navigate(typed)
   end
 
   def self.click(target)
