@@ -503,7 +503,7 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
         divider.setVisibility(View.VISIBLE);
         devtoolsContainer.setVisibility(View.VISIBLE);
         if (devtoolsView == null) {
-            devtoolsView = new WebView(this);
+            devtoolsView = new DevToolsWebView(this);
             WebSettings s = devtoolsView.getSettings();
             s.setJavaScriptEnabled(true);
             s.setDomStorageEnabled(true);
@@ -523,6 +523,14 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
                 @Override public void onPageFinished(WebView v, String u) {
                     if (!u.startsWith(DEVTOOLS_CDN)) return;
                     status("frontend loaded");
+                    // Plain-text editing for DevTools' contenteditable fields (Android IME composition
+                    // otherwise garbles inline style/attribute edits).
+                    v.evaluateJavascript("(function(){var st=document.createElement('style');st.textContent="
+                            + "'[contenteditable],[contenteditable] *{-webkit-user-modify:read-write-plaintext-only !important}';"
+                            + "document.head.appendChild(st);"
+                            + "var fix=function(root){root.querySelectorAll('[contenteditable],input,textarea').forEach(function(e){e.setAttribute('autocomplete','off');e.setAttribute('autocorrect','off');e.setAttribute('autocapitalize','off');e.setAttribute('spellcheck','false');});};"
+                            + "fix(document);new MutationObserver(function(ms){ms.forEach(function(m){m.addedNodes.forEach(function(n){if(n.querySelectorAll)fix(n);});});}).observe(document.documentElement,{childList:true,subtree:true});"
+                            + "return 'ok';})()", null);
                     // Apply Ruby-owned DevTools prefs (theme, screencast) via the frontend's localStorage
                     // settings store; reload once if anything changed.
                     String want = "{screencastEnabled:'" + (devtoolsScreencast ? "true" : "false") + "',uiTheme:'\"" + devtoolsTheme + "\"'}";
