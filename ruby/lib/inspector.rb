@@ -16,7 +16,11 @@ module Inspector
       end
       return
     end
-    node = Cdp.call(target_id, "DOM.getNodeForLocation", { "x" => css_x.round, "y" => css_y.round, "includeUserAgentShadowDOM" => false })
+    node = Cdp.session(target_id) do |c|
+      c.call("DOM.enable")
+      c.call("DOM.getDocument", { "depth" => 0 })
+      c.call("DOM.getNodeForLocation", { "x" => css_x.round, "y" => css_y.round, "includeUserAgentShadowDOM" => false })
+    end
     backend_id = node["backendNodeId"]
     unless backend_id
       Host.emit("status", "text" => "Inspect: no element at that point")

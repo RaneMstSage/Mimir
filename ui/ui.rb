@@ -703,8 +703,12 @@ module UI
     end.join
     show(m, html)
     x = @ctx["x"].to_f ; y = @ctx["y"].to_f
-    `#{m}.style.left = Math.max(4, Math.min(#{x}, window.innerWidth - 250)) + 'px'`
-    `#{m}.style.top = Math.max(4, Math.min(#{y}, window.innerHeight - #{m}.offsetHeight - 8)) + 'px'`
+    # The chrome layer is still collapsed at this moment, so clamp against the window size Java sent.
+    win_w = @ctx["win_w"].to_f ; win_h = @ctx["win_h"].to_f
+    win_w = `window.innerWidth`.to_f if win_w <= 0
+    win_h = `screen.height`.to_f if win_h <= 0
+    `#{m}.style.left = Math.max(4, Math.min(#{x}, #{win_w} - 250)) + 'px'`
+    `#{m}.style.top = Math.max(4, Math.min(#{y}, #{win_h} - #{m}.offsetHeight - 8)) + 'px'`
     sync_height
   rescue Exception => e
     report_error("context", e)

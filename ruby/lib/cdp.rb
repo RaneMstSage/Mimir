@@ -4,13 +4,23 @@ class Cdp
   class Error < StandardError; end
 
   def self.call(target_id, method, params = {}, timeout: 2)
+    session(target_id, timeout: timeout) { |c| c.call(method, params) }
+  end
+
+  # Several commands over one connection: Cdp.session(id) { |c| c.call("DOM.enable"); c.call(...) }
+  def self.session(target_id, timeout: 2)
     c = new(target_id, timeout)
     begin
-      c.send_cmd(1, method, params)
-      c.wait_result(1)
+      yield c
     ensure
       c.close
     end
+  end
+
+  def call(method, params = {})
+    @next_id = (@next_id || 0) + 1
+    send_cmd(@next_id, method, params)
+    wait_result(@next_id)
   end
 
   def initialize(target_id, timeout)
@@ -69,7 +79,7 @@ class Cdp
   end
 
   def wait_result(id)
-    10.times do
+    50.times do
       msg = JSON.parse(read_message)
       next unless msg["id"] == id
       raise Error, (msg["error"] || {})["message"].to_s if msg["error"]

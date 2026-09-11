@@ -248,20 +248,29 @@ App.on("context.menu") do |ev|
   type = ev["type"].to_s
   link = ev["link"].to_s
   src  = ev["src"].to_s
+  sel  = ev["selection"].to_s.strip
+  if !sel.empty?
+    short = sel.size > 24 ? sel[0, 24] + "…" : sel
+    items << ["copy_sel", "Copy"] << ["search_sel", "Search the web for “#{short}”"] << :hr
+  end
   if type.start_with?("link")
-    items << ["open_tab", "Open link in new tab"] << ["copy_link", "Copy link address"] << ["copy_link_text", "Copy link text"]
-    items << :hr
+    items << ["open_tab", "Open link in new tab"] << ["copy_link", "Copy link address"] << :hr
   end
   if type == "image" || type == "link_image"
     items << ["open_image", "Open image in new tab"] << ["copy_image", "Copy image address"] << :hr
   end
-  items << ["copy_sel", "Copy"] << ["search_sel", "Search the web for selection"] << :hr unless type.start_with?("link") || type == "image"
-  items << ["back", "Back"] if ev["can_back"]
-  items << ["forward", "Forward"] if ev["can_forward"]
-  items << ["reload", "Reload"] << :hr << ["inspect", "Inspect element"]
-  Host.emit("ui.context", "x" => ev["x"], "y" => ev["y"],
+  if type == "input"
+    items << ["paste", "Paste"] << ["select_all", "Select all"] << :hr
+  end
+  if sel.empty? && !type.start_with?("link") && type != "image" && type != "input"
+    items << ["back", "Back"] if ev["can_back"]
+    items << ["forward", "Forward"] if ev["can_forward"]
+    items << ["reload", "Reload"] << ["select_all", "Select all"] << :hr
+  end
+  items << ["inspect", "Inspect element"]
+  Host.emit("ui.context", "x" => ev["x"], "y" => ev["y"], "win_w" => ev["win_w"], "win_h" => ev["win_h"],
             "items" => items.map { |i| i == :hr ? { "hr" => true } : { "id" => i[0], "label" => i[1] } },
-            "target" => { "tab" => ev["tab"], "type" => type, "link" => link, "src" => src, "css_x" => ev["css_x"], "css_y" => ev["css_y"] })
+            "target" => { "tab" => ev["tab"], "type" => type, "link" => link, "src" => src, "selection" => sel, "css_x" => ev["css_x"], "css_y" => ev["css_y"] })
 end
 
 App.on("context.action") do |ev|
@@ -271,11 +280,12 @@ App.on("context.action") do |ev|
   case ev["id"].to_s
   when "open_tab"       then br.new_tab(t["link"], select: false)
   when "copy_link"      then Host.emit("clipboard.set", "label" => "Link", "text" => t["link"])
-  when "copy_link_text" then Host.emit("tab.selection", "tab" => tab, "purpose" => "copy")   # best effort: selected text
   when "open_image"     then br.new_tab(t["src"], select: false)
   when "copy_image"     then Host.emit("clipboard.set", "label" => "Image", "text" => t["src"])
-  when "copy_sel"       then Host.emit("tab.selection", "tab" => tab, "purpose" => "copy")
-  when "search_sel"     then Host.emit("tab.selection", "tab" => tab, "purpose" => "search")
+  when "copy_sel"       then Host.emit("clipboard.set", "label" => "Text", "text" => t["selection"].to_s)
+  when "search_sel"     then br.new_tab(UrlNorm.normalize(t["selection"].to_s, br.settings["search"]))
+  when "select_all"     then Host.emit("tab.inject", "tab" => tab, "js" => "document.execCommand('selectAll')")
+  when "paste"          then Host.emit("tab.paste", "tab" => tab)
   when "back"           then br.nav(tab, "back")
   when "forward"        then br.nav(tab, "forward")
   when "reload"         then br.nav(tab, "reload")

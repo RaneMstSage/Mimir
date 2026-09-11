@@ -214,6 +214,15 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
                 case "ui.context": chrome.evaluateJavascript("window.UI && UI.context(" + JSONObject.quote(cmd.toString()) + ")", null); break;
                 case "tab.stop": { WebView w = tabs.get(cmd.getInt("tab")); if (w != null) w.stopLoading(); break; }
                 case "clipboard.set": copyToClipboard(cmd.optString("label", "Mímir"), cmd.optString("text")); toast("Copied"); break;
+                case "tab.paste": {
+                    WebView w = tabs.get(cmd.getInt("tab"));
+                    android.content.ClipboardManager cm = (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+                    if (w != null && cm != null && cm.hasPrimaryClip() && cm.getPrimaryClip().getItemCount() > 0) {
+                        CharSequence txt = cm.getPrimaryClip().getItemAt(0).coerceToText(this);
+                        w.evaluateJavascript("document.execCommand('insertText', false, " + JSONObject.quote(String.valueOf(txt)) + ")", null);
+                    }
+                    break;
+                }
                 case "tab.selection": {   // ask the page for its selected text; Ruby gets it back as an event
                     final WebView w = tabs.get(cmd.getInt("tab")); final String purpose = cmd.optString("purpose");
                     if (w != null) w.evaluateJavascript("String(window.getSelection())", r -> ruby.event("page.selection", "tab", cmd.optInt("tab"), "text", r == null ? "" : r.replaceAll("^\"|\"$", ""), "purpose", purpose));
@@ -365,27 +374,34 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
         });
     }
 
-    private void contextMenu(WebView w, int id) {
-        android.webkit.WebView.HitTestResult hit = w.getHitTestResult();
-        String type = "page";
-        String link = "", src = "";
+    private void contextMenu(final WebView w, final int id) {
+        WebView.HitTestResult hit = w.getHitTestResult();
+        String t = "page", link = "", src = "";
         switch (hit.getType()) {
-            case android.webkit.WebView.HitTestResult.SRC_ANCHOR_TYPE: type = "link"; link = hit.getExtra(); break;
-            case android.webkit.WebView.HitTestResult.SRC_IMAGE_ANCHOR_TYPE: type = "link_image"; link = hit.getExtra(); break;
-            case android.webkit.WebView.HitTestResult.IMAGE_TYPE: type = "image"; src = hit.getExtra(); break;
-            case android.webkit.WebView.HitTestResult.EDIT_TEXT_TYPE: type = "input"; break;
-            default: type = "page";
+            case WebView.HitTestResult.SRC_ANCHOR_TYPE: t = "link"; link = hit.getExtra(); break;
+            case WebView.HitTestResult.SRC_IMAGE_ANCHOR_TYPE: t = "link_image"; link = hit.getExtra(); break;
+            case WebView.HitTestResult.IMAGE_TYPE: t = "image"; src = hit.getExtra(); break;
+            case WebView.HitTestResult.EDIT_TEXT_TYPE: t = "input"; break;
+            default: t = "page";
         }
-        float density = getResources().getDisplayMetrics().density;
-        // Position for the popup, in dp relative to the window; the chrome layer is a full-window overlay.
-        int[] loc = new int[2]; w.getLocationInWindow(loc);
-        float xDp = (loc[0] + lastPointer[0]) / density, yDp = (loc[1] + lastPointer[1]) / density;
-        // Page CSS pixels for DOM lookup: view px / (density * page scale)
-        float scale = w.getScale() == 0 ? density : w.getScale();
-        float cssX = lastPointer[0] / scale, cssY = lastPointer[1] / scale;
-        ruby.event("context.menu", "tab", id, "type", type, "link", link == null ? "" : link, "src", src == null ? "" : src,
-                "x", (double) xDp, "y", (double) yDp, "css_x", (double) cssX, "css_y", (double) cssY,
-                "can_back", w.canGoBack(), "can_forward", w.canGoForward());
+        final String type = t, linkF = link == null ? "" : link, srcF = src == null ? "" : src;
+        final float density = getResources().getDisplayMetrics().density;
+        final int[] loc = new int[2]; w.getLocationInWindow(loc);
+        final double xDp = (loc[0] + lastPointer[0]) / density, yDp = (loc[1] + lastPointer[1]) / density;
+        final float scale = w.getScale() == 0 ? density : w.getScale();
+        final double cssX = lastPointer[0] / scale, cssY = lastPointer[1] / scale;
+        final View root = findViewById(android.R.id.content);
+        final double winW = root.getWidth() / density, winH = root.getHeight() / density;
+        // Read the current selection first so Ruby can offer Copy / Search when text is selected.
+        w.evaluateJavascript("String(window.getSelection())", sel -> {
+            String selection = sel == null ? "" : sel;
+            if (selection.length() >= 2 && selection.startsWith("\"")) {
+                try { selection = new org.json.JSONArray("[" + selection + "]").getString(0); } catch (Exception ignored) {}
+            }
+            ruby.event("context.menu", "tab", id, "type", type, "link", linkF, "src", srcF, "selection", selection,
+                    "x", xDp, "y", yDp, "win_w", winW, "win_h", winH, "css_x", cssX, "css_y", cssY,
+                    "can_back", w.canGoBack(), "can_forward", w.canGoForward());
+        });
     }
 
     private void copyToClipboard(String label, String text) {

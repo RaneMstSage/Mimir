@@ -209,7 +209,15 @@ test "context menu items depend on the hit target and actions route correctly" d
   App.handle({ "ev" => "context.menu", "tab" => 1, "type" => "link", "link" => "https://l.test/", "src" => "", "x" => 10, "y" => 20, "css_x" => 5, "css_y" => 6, "can_back" => true, "can_forward" => false }.to_json)
   ctx = Inspect.emitted.find { |c| c["cmd"] == "ui.context" }
   ids = ctx["items"].map { |i| i["id"] }.compact
-  assert ids.include?("open_tab") && ids.include?("copy_link") && ids.include?("inspect") && ids.include?("back") && !ids.include?("forward"), ids.inspect
+  assert ids.include?("open_tab") && ids.include?("copy_link") && ids.include?("inspect") && !ids.include?("back"), ids.inspect
+  Inspect.emitted.clear
+  App.handle({ "ev" => "context.menu", "tab" => 1, "type" => "page", "link" => "", "src" => "", "selection" => "hello world", "x" => 1, "y" => 2, "css_x" => 1, "css_y" => 2, "can_back" => true, "can_forward" => false }.to_json)
+  sel_ids = Inspect.emitted.find { |c| c["cmd"] == "ui.context" }["items"].map { |i| i["id"] }.compact
+  assert sel_ids.include?("copy_sel") && sel_ids.include?("search_sel") && !sel_ids.include?("back"), sel_ids.inspect
+  Inspect.emitted.clear
+  App.handle({ "ev" => "context.menu", "tab" => 1, "type" => "page", "link" => "", "src" => "", "selection" => "", "x" => 1, "y" => 2, "css_x" => 1, "css_y" => 2, "can_back" => true, "can_forward" => false }.to_json)
+  page_ids = Inspect.emitted.find { |c| c["cmd"] == "ui.context" }["items"].map { |i| i["id"] }.compact
+  assert page_ids.include?("back") && page_ids.include?("reload") && page_ids.include?("inspect") && !page_ids.include?("copy_sel"), page_ids.inspect
   Inspect.emitted.clear
   App.handle({ "ev" => "context.action", "id" => "copy_link", "target" => ctx["target"] }.to_json)
   clip = Inspect.emitted.find { |c| c["cmd"] == "clipboard.set" }
