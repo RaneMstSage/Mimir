@@ -209,14 +209,12 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
         return super.dispatchGenericMotionEvent(ev);
     }
 
-    private long lastBackMs = 0;
-
-    /** Single back handler for the mouse back button, the gesture, and older key-based back.
-     *  Debounced: some devices deliver one press through several channels at once. */
+    /** System/gesture/dispatcher back. Shares the debounce clock with navHistory so a mouse back
+     *  delivered as BOTH a key event and a back-dispatch invocation navigates only once. */
     private void handleBack() {
         long now = android.os.SystemClock.uptimeMillis();
-        if (now - lastBackMs < 350) return;
-        lastBackMs = now;
+        if (now - lastNavMs < 400) return;
+        lastNavMs = now;
         WebView w = tabs.get(currentTab);
         if (w != null && w.canGoBack()) { w.goBack(); return; }
         if (devtoolsOpen) { ruby.event("devtools.toggle"); return; }
