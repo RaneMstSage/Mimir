@@ -169,6 +169,17 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
     }
 
     @Override
+    public boolean onKeyDown(int keyCode, KeyEvent event) {
+        // A mouse BACK button often arrives as KEYCODE_BACK from SOURCE_MOUSE; treat it as tab-back.
+        if (keyCode == KeyEvent.KEYCODE_BACK && event.getSource() != 0
+                && (event.getSource() & android.view.InputDevice.SOURCE_MOUSE) == android.view.InputDevice.SOURCE_MOUSE) {
+            WebView w = tabs.get(currentTab);
+            if (w != null && w.canGoBack()) { w.goBack(); return true; }
+        }
+        return super.onKeyDown(keyCode, event);
+    }
+
+    @Override
     public void onBackPressed() {
         WebView w = tabs.get(currentTab);
         if (w != null && w.canGoBack()) w.goBack();
@@ -356,10 +367,11 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
         // never fire. Catch the secondary (right) button press in the raw motion stream instead.
         w.setOnGenericMotionListener((v, ev) -> {
             lastPointer[0] = ev.getX(); lastPointer[1] = ev.getY();
-            if (ev.getActionMasked() == MotionEvent.ACTION_BUTTON_PRESS
-                    && (ev.getActionButton() == MotionEvent.BUTTON_SECONDARY || ev.getActionButton() == MotionEvent.BUTTON_STYLUS_PRIMARY)) {
-                contextMenu(w, id);
-                return true;
+            if (ev.getActionMasked() == MotionEvent.ACTION_BUTTON_PRESS) {
+                int b = ev.getActionButton();
+                if (b == MotionEvent.BUTTON_SECONDARY || b == MotionEvent.BUTTON_STYLUS_PRIMARY) { contextMenu(w, id); return true; }
+                if (b == MotionEvent.BUTTON_BACK)    { if (w.canGoBack()) w.goBack(); return true; }
+                if (b == MotionEvent.BUTTON_FORWARD) { if (w.canGoForward()) w.goForward(); return true; }
             }
             return false;
         });
@@ -388,16 +400,22 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
         final float density = getResources().getDisplayMetrics().density;
         final int[] loc = new int[2]; w.getLocationInWindow(loc);
         final double xDp = (loc[0] + lastPointer[0]) / density, yDp = (loc[1] + lastPointer[1]) / density;
-        final float scale = w.getScale() == 0 ? density : w.getScale();
-        final double cssX = lastPointer[0] / scale, cssY = lastPointer[1] / scale;
         final View root = findViewById(android.R.id.content);
         final double winW = root.getWidth() / density, winH = root.getHeight() / density;
-        // Read the current selection first so Ruby can offer Copy / Search when text is selected.
-        w.evaluateJavascript("String(window.getSelection())", sel -> {
-            String selection = sel == null ? "" : sel;
-            if (selection.length() >= 2 && selection.startsWith("\"")) {
-                try { selection = new org.json.JSONArray("[" + selection + "]").getString(0); } catch (Exception ignored) {}
-            }
+        final float px = lastPointer[0], py = lastPointer[1];
+        // Ask the page for both the selection and the exact CSS-pixel coordinates at the pointer.
+        // window.getSelection() + a point mapped through devicePixelRatio, computed in-page.
+        String js = "(function(x,y){return JSON.stringify({s:String(window.getSelection()),"
+                + "cx:Math.round(x/window.devicePixelRatio),cy:Math.round(y/window.devicePixelRatio)});})("
+                + px + "," + py + ")";
+        w.evaluateJavascript(js, res -> {
+            String selection = ""; double cssX = 0, cssY = 0;
+            try {
+                String raw = res;
+                if (raw != null && raw.startsWith("\"")) raw = new org.json.JSONArray("[" + raw + "]").getString(0);
+                org.json.JSONObject o = new org.json.JSONObject(raw);
+                selection = o.optString("s", ""); cssX = o.optDouble("cx", 0); cssY = o.optDouble("cy", 0);
+            } catch (Exception ignored) {}
             ruby.event("context.menu", "tab", id, "type", type, "link", linkF, "src", srcF, "selection", selection,
                     "x", xDp, "y", yDp, "win_w", winW, "win_h", winH, "css_x", cssX, "css_y", cssY,
                     "can_back", w.canGoBack(), "can_forward", w.canGoForward());
