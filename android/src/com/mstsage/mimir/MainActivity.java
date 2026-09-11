@@ -172,15 +172,29 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
         return null;
     }
 
+    private long lastNavMs = 0;
+
+    // One debounced history navigator for the mouse back/forward buttons. This DeX mouse fires a
+    // burst per press (a real BACK followed by phantom FORWARD pairs), so the first event in a
+    // 400ms window wins and the rest are ignored. Never exits the app.
+    private boolean navHistory(int dir) {
+        long now = android.os.SystemClock.uptimeMillis();
+        if (now - lastNavMs < 400) return true;   // consume the phantom burst
+        lastNavMs = now;
+        WebView w = tabs.get(currentTab);
+        if (w == null) return true;
+        if (dir < 0 && w.canGoBack()) w.goBack();
+        else if (dir > 0 && w.canGoForward()) w.goForward();
+        return true;
+    }
+
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
         int kc = event.getKeyCode();
         boolean mouse = (event.getSource() & android.view.InputDevice.SOURCE_MOUSE) == android.view.InputDevice.SOURCE_MOUSE;
-        ruby.appendLog("[key] " + KeyEvent.keyCodeToString(kc) + " act=" + event.getAction() + " src=" + event.getSource() + " rc=" + event.getRepeatCount());
-        if (event.getAction() == KeyEvent.ACTION_DOWN) {
-            WebView w = tabs.get(currentTab);
-            if (kc == KeyEvent.KEYCODE_FORWARD && w != null) { if (w.canGoForward()) w.goForward(); return true; }
-            if (kc == KeyEvent.KEYCODE_BACK && mouse && w != null && w.canGoBack()) { w.goBack(); return true; }
+        if (event.getAction() == KeyEvent.ACTION_DOWN && mouse) {
+            if (kc == KeyEvent.KEYCODE_BACK)    return navHistory(-1);
+            if (kc == KeyEvent.KEYCODE_FORWARD) return navHistory(1);
         }
         return super.dispatchKeyEvent(event);
     }
@@ -189,12 +203,8 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
     public boolean dispatchGenericMotionEvent(MotionEvent ev) {
         if (ev.getActionMasked() == MotionEvent.ACTION_BUTTON_PRESS) {
             int b = ev.getActionButton();
-            ruby.appendLog("[mouse-activity] button=" + b + " src=" + ev.getSource());
-            WebView w = tabs.get(currentTab);
-            if (w != null) {
-                if (b == MotionEvent.BUTTON_BACK)    { if (w.canGoBack()) w.goBack(); return true; }
-                if (b == MotionEvent.BUTTON_FORWARD) { if (w.canGoForward()) w.goForward(); return true; }
-            }
+            if (b == MotionEvent.BUTTON_BACK)    return navHistory(-1);
+            if (b == MotionEvent.BUTTON_FORWARD) return navHistory(1);
         }
         return super.dispatchGenericMotionEvent(ev);
     }
@@ -203,10 +213,8 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
 
     /** Single back handler for the mouse back button, the gesture, and older key-based back.
      *  Debounced: some devices deliver one press through several channels at once. */
-    private int backCount = 0;
     private void handleBack() {
         long now = android.os.SystemClock.uptimeMillis();
-        ruby.appendLog("[back] call #" + (++backCount) + " dt=" + (now - lastBackMs));
         if (now - lastBackMs < 350) return;
         lastBackMs = now;
         WebView w = tabs.get(currentTab);
@@ -405,10 +413,7 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
             lastPointer[0] = ev.getX(); lastPointer[1] = ev.getY();
             if (ev.getActionMasked() == MotionEvent.ACTION_BUTTON_PRESS) {
                 int b = ev.getActionButton();
-                ruby.appendLog("[mouse] button_press button=" + b + " src=" + ev.getSource());
                 if (b == MotionEvent.BUTTON_SECONDARY || b == MotionEvent.BUTTON_STYLUS_PRIMARY) { contextMenu(w, id); return true; }
-                if (b == MotionEvent.BUTTON_BACK)    { if (w.canGoBack()) w.goBack(); return true; }
-                if (b == MotionEvent.BUTTON_FORWARD) { if (w.canGoForward()) w.goForward(); return true; }
             }
             return false;
         });
