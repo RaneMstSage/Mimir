@@ -335,9 +335,14 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
 
     // ---- context menu (right-click in DeX / long-press on touch) ----
     private final float[] lastPointer = new float[2];   // last pointer position inside the page view (px)
+    private boolean lastFromMouse = false;              // DeX may deliver a right-click as a long-press
 
     private void installContextMenu(final WebView w, final int id) {
-        w.setOnTouchListener((v, ev) -> { lastPointer[0] = ev.getX(); lastPointer[1] = ev.getY(); return false; });
+        w.setOnTouchListener((v, ev) -> {
+            lastPointer[0] = ev.getX(); lastPointer[1] = ev.getY();
+            lastFromMouse = ev.isFromSource(android.view.InputDevice.SOURCE_MOUSE) || ev.getToolType(0) == MotionEvent.TOOL_TYPE_MOUSE;
+            return false;
+        });
         // Mouse: Chromium's WebView consumes button events itself, so OnContextClickListener may
         // never fire. Catch the secondary (right) button press in the raw motion stream instead.
         w.setOnGenericMotionListener((v, ev) -> {
@@ -352,6 +357,7 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
         w.setOnContextClickListener(v -> { contextMenu(w, id); return true; });   // fallback path (some devices)
         // Touch: long-press opens our menu on links and images only; on text, let the WebView select.
         w.setOnLongClickListener(v -> {
+            if (lastFromMouse) { contextMenu(w, id); return true; }      // right-click translated to long-press
             int t = w.getHitTestResult().getType();
             if (t == WebView.HitTestResult.SRC_ANCHOR_TYPE || t == WebView.HitTestResult.SRC_IMAGE_ANCHOR_TYPE
                     || t == WebView.HitTestResult.IMAGE_TYPE) { contextMenu(w, id); return true; }
