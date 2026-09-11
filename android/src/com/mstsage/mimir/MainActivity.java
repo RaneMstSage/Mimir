@@ -144,6 +144,10 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
 
         ruby.setListener(this);
         support.connect(this, ruby);
+        if (android.os.Build.VERSION.SDK_INT >= 33) {
+            getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
+                    android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT, this::handleBack);
+        }
         final String startUrl = urlFromIntent(getIntent());
         main.post(() -> {
             ruby.start(this);
@@ -197,13 +201,17 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
         return super.dispatchGenericMotionEvent(ev);
     }
 
-    @Override
-    public void onBackPressed() {
+    /** Single back handler for the mouse back button, the gesture, and older key-based back. */
+    private void handleBack() {
+        ruby.appendLog("[back] handleBack canGoBack=" + (tabs.get(currentTab) != null && tabs.get(currentTab).canGoBack()) + " devtools=" + devtoolsOpen);
         WebView w = tabs.get(currentTab);
-        if (w != null && w.canGoBack()) w.goBack();
-        else if (devtoolsOpen) ruby.event("devtools.toggle");
-        else super.onBackPressed();
+        if (w != null && w.canGoBack()) { w.goBack(); return; }
+        if (devtoolsOpen) { ruby.event("devtools.toggle"); return; }
+        moveTaskToBack(true);   // at a tab's first page: background gracefully, don't close
     }
+
+    @Override
+    public void onBackPressed() { handleBack(); }
 
     @Override
     protected void onDestroy() {
