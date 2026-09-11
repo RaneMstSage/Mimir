@@ -349,6 +349,7 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
         s.setMixedContentMode(WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE);
         s.setAllowFileAccess(false);
         if (desktopUa) s.setUserAgentString(DESKTOP_UA);
+        tune(w, desktopUa);
         w.setBackgroundColor(Color.WHITE);
         applyPrefs(w);
     }
@@ -433,7 +434,17 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
 
     private void setDesktopUa(boolean desktop) {
         desktopUa = desktop;
-        for (WebView w : tabs.values()) w.getSettings().setUserAgentString(desktop ? DESKTOP_UA : null);
+        for (WebView w : tabs.values()) {
+            w.getSettings().setUserAgentString(desktop ? DESKTOP_UA : null);
+            tune(w, desktop);
+        }
+    }
+
+    /** Present pages as Chrome rather than an embedded WebView (Gradle builds only; no-op otherwise). */
+    private static void tune(WebView w, boolean desktop) {
+        try {
+            Class.forName("com.mstsage.mimir.WebViewTuning").getMethod("apply", WebView.class, boolean.class).invoke(null, w, desktop);
+        } catch (Throwable ignored) {}
     }
 
     /** The chrome renders Ruby's snapshot; nothing native to update besides the pane state. */

@@ -6,3 +6,5 @@
 # WebView JavaScript bridge
 -keepclassmembers class * { @android.webkit.JavascriptInterface <methods>; }
 -keepattributes JavascriptInterface
+# Loaded reflectively by MainActivity
+-keep class com.mstsage.mimir.WebViewTuning { *; }
