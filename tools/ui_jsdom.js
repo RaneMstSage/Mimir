@@ -49,6 +49,10 @@ try {
   click(doc.querySelector('[data-act="billing.buy"]'));
   console.log('buy sent:', sent.some(e => e.ev === 'billing.buy' && e.product === 'tip_small'));
   click(doc.querySelector('[data-act="page:close"]'));
+  window.UI.context(JSON.stringify({cmd:'ui.context', x: 100, y: 200, items:[{id:'open_tab',label:'Open link in new tab'},{hr:true},{id:'inspect',label:'Inspect element'}], target:{tab:1,type:'link',link:'https://l.test/'}}));
+  console.log('context menu:', !doc.getElementById('ctx').hidden && doc.getElementById('ctx').innerHTML.includes('Inspect element'));
+  click(doc.querySelector('[data-act="ctx:inspect"]'));
+  console.log('context action sent:', sent.some(e => e.ev === 'context.action' && e.id === 'inspect' && e.target && e.target.tab === 1), '| closed:', doc.getElementById('ctx').hidden);
   const uiErrors = sent.filter(e => e.ev === 'ui.error');
   if (uiErrors.length) { console.log('UI ERRORS:', JSON.stringify(uiErrors, null, 1)); errors.push('ui.error events: ' + uiErrors.map(e => e.text).join(' | ')); }
   click(doc.querySelector('[data-act="page:close"]')); click(doc.querySelector('[data-act="tab.new"]'));

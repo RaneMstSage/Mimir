@@ -14,6 +14,7 @@ module UI
   @mgr_folder = "bar"     # bookmarks manager: current folder id
   @script_id = nil        # scripts page: script being edited (nil = list)
   @sel = -1               # highlighted omnibox suggestion (keyboard navigation)
+  @ctx = nil              # open page context menu: { "items" => [...], "target" => {...} }
   @menu_open = false
   @page = nil            # nil | "settings" | "history" | "bookmarks" | "about"
   @section = nil         # settings section
@@ -144,7 +145,7 @@ module UI
   def self.sync_height
     dp = 80 + (@state["bookmarks_bar"] ? 28 : 0)
     suggest_open = `!#{el("suggest")}.hidden`
-    expand = !!(@page || @menu_open || suggest_open || @bm_folder || @bm_popup)
+    expand = !!(@page || @menu_open || suggest_open || @bm_folder || @bm_popup || @ctx)
     `window.host && window.host.send(#{ { "ev" => "chrome.height", "dp" => dp, "expand" => expand }.to_json })`
   end
 
@@ -366,6 +367,13 @@ module UI
     tab = `String(#{target}.dataset.tab || "")`
     tab = tab.empty? ? nil : tab.to_i
     @menu_open = false unless act == "menu.toggle"
+    if act.start_with?("ctx:")
+      id = act[4..-1]
+      target = (@ctx || {})["target"]
+      close_context
+      send("context.action", "id" => id, "target" => target)
+      return
+    end
     if act.start_with?("page:")
       @page = act[5..-1]
       @page = nil if @page == "close"
@@ -684,6 +692,30 @@ module UI
     "</div>"
   end
 
+  # ---- page context menu (items decided by Ruby; positioned in window dp) ----
+  def self.context(json)
+    @ctx = JSON.parse(`String(#{json})`)
+    m = el("ctx")
+    html = (@ctx["items"] || []).map do |it|
+      next "<hr>" if it["hr"]
+      cls = it["id"] == "inspect" ? "m strong" : "m"
+      "<button class=\"#{cls}\" data-act=\"ctx:#{esc(it["id"])}\">#{esc(it["label"])}</button>"
+    end.join
+    show(m, html)
+    x = @ctx["x"].to_f ; y = @ctx["y"].to_f
+    `#{m}.style.left = Math.max(4, Math.min(#{x}, window.innerWidth - 250)) + 'px'`
+    `#{m}.style.top = Math.max(4, Math.min(#{y}, window.innerHeight - #{m}.offsetHeight - 8)) + 'px'`
+    sync_height
+  rescue Exception => e
+    report_error("context", e)
+  end
+
+  def self.close_context
+    @ctx = nil
+    hide(el("ctx"))
+    sync_height
+  end
+
   def self.boot
     %x{
       window.UI = {
@@ -692,6 +724,7 @@ module UI
         filter: function(q){ #{filter(`String(q || "")`)} },
         rename_from: function(el){ #{rename_from(`el`)} },
         change_move: function(el){ #{change_move(`el`)} },
+        context: function(j){ #{context(`j`)} },
         relayout: function(){ #{relayout} }
       };
       document.addEventListener('click', function(e){
@@ -700,6 +733,7 @@ module UI
         if (!e.target.closest('#menu')) { #{@menu_open = false; render_menu} }
         if (!e.target.closest('#bmdrop')) { #{@bm_folder = nil; @bm_path = []; render_bookmarks; render_bmdrop; sync_height} }
         if (!e.target.closest('#bmpop')) { #{@bm_popup = nil; render_bmpop; sync_height} }
+        if (!e.target.closest('#ctx')) { #{close_context if @ctx} }
       });
       document.addEventListener('contextmenu', function(e){ e.preventDefault(); });
     }

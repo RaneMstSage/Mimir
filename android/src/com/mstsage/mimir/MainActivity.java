@@ -211,7 +211,14 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
                 case "devtools.prefs": devtoolsTheme = cmd.optString("theme", "dark"); devtoolsScreencast = cmd.optBoolean("screencast", false); break;
                 case "data.clear": clearData(cmd); break;
                 case "ui.state": renderState(cmd.getJSONObject("state")); break;
+                case "ui.context": chrome.evaluateJavascript("window.UI && UI.context(" + JSONObject.quote(cmd.toString()) + ")", null); break;
                 case "tab.stop": { WebView w = tabs.get(cmd.getInt("tab")); if (w != null) w.stopLoading(); break; }
+                case "clipboard.set": copyToClipboard(cmd.optString("label", "Mímir"), cmd.optString("text")); toast("Copied"); break;
+                case "tab.selection": {   // ask the page for its selected text; Ruby gets it back as an event
+                    final WebView w = tabs.get(cmd.getInt("tab")); final String purpose = cmd.optString("purpose");
+                    if (w != null) w.evaluateJavascript("String(window.getSelection())", r -> ruby.event("page.selection", "tab", cmd.optInt("tab"), "text", r == null ? "" : r.replaceAll("^\"|\"$", ""), "purpose", purpose));
+                    break;
+                }
                 case "dev.toggle": toggleRubyPane(); break;
                 case "devtools.dock": openDevtools(cmd.optString("side", "right"), (float) cmd.optDouble("fraction", 0.45)); break;
                 case "devtools.open": {
@@ -321,8 +328,47 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
         w.setVisibility(View.GONE);
         pages.addView(w);
         tabs.put(id, w);
+        installContextMenu(w, id);
 
         if (url != null && !url.isEmpty()) w.loadUrl(url);
+    }
+
+    // ---- context menu (right-click in DeX / long-press on touch) ----
+    private final float[] lastPointer = new float[2];   // last pointer position inside the page view (px)
+
+    private void installContextMenu(final WebView w, final int id) {
+        w.setOnTouchListener((v, ev) -> { lastPointer[0] = ev.getX(); lastPointer[1] = ev.getY(); return false; });
+        w.setOnGenericMotionListener((v, ev) -> { lastPointer[0] = ev.getX(); lastPointer[1] = ev.getY(); return false; });
+        w.setOnLongClickListener(v -> { contextMenu(w, id); return true; });          // touch long-press
+        w.setOnContextClickListener(v -> { contextMenu(w, id); return true; });       // mouse right-click (API 23+)
+    }
+
+    private void contextMenu(WebView w, int id) {
+        android.webkit.WebView.HitTestResult hit = w.getHitTestResult();
+        String type = "page";
+        String link = "", src = "";
+        switch (hit.getType()) {
+            case android.webkit.WebView.HitTestResult.SRC_ANCHOR_TYPE: type = "link"; link = hit.getExtra(); break;
+            case android.webkit.WebView.HitTestResult.SRC_IMAGE_ANCHOR_TYPE: type = "link_image"; link = hit.getExtra(); break;
+            case android.webkit.WebView.HitTestResult.IMAGE_TYPE: type = "image"; src = hit.getExtra(); break;
+            case android.webkit.WebView.HitTestResult.EDIT_TEXT_TYPE: type = "input"; break;
+            default: type = "page";
+        }
+        float density = getResources().getDisplayMetrics().density;
+        // Position for the popup, in dp relative to the window; the chrome layer is a full-window overlay.
+        int[] loc = new int[2]; w.getLocationInWindow(loc);
+        float xDp = (loc[0] + lastPointer[0]) / density, yDp = (loc[1] + lastPointer[1]) / density;
+        // Page CSS pixels for DOM lookup: view px / (density * page scale)
+        float scale = w.getScale() == 0 ? density : w.getScale();
+        float cssX = lastPointer[0] / scale, cssY = lastPointer[1] / scale;
+        ruby.event("context.menu", "tab", id, "type", type, "link", link == null ? "" : link, "src", src == null ? "" : src,
+                "x", (double) xDp, "y", (double) yDp, "css_x", (double) cssX, "css_y", (double) cssY,
+                "can_back", w.canGoBack(), "can_forward", w.canGoForward());
+    }
+
+    private void copyToClipboard(String label, String text) {
+        android.content.ClipboardManager cm = (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+        if (cm != null) cm.setPrimaryClip(android.content.ClipData.newPlainText(label, text));
     }
 
     private void showTab(int id) {

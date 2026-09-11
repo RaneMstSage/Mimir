@@ -15,6 +15,7 @@ module App
   def self.boot    ; @boot ; end
   def self.browser ; @browser ; end
   def self.scripts ; @scripts ; end
+  def self.attached_target ; @attached_target ; end
 
   def self.run(boot_json)
     @boot = JSON.parse(boot_json.to_s) rescue {}
@@ -31,7 +32,8 @@ module App
     while @running
       readers = [wake] + Loop.readers
       writers = Loop.writers
-      ready = IO.select(readers, writers, nil, 1.0)
+      ready = IO.select(readers, writers, nil, Loop.next_timeout(1.0))
+      Loop.run_timers
       next unless ready
       if ready[0].include?(wake)
         begin
@@ -112,6 +114,7 @@ module App
     wk = target["devtoolsFrontendUrl"].to_s.start_with?("http") ? nil : DevTools.version["WebKit-Version"]
     fe = DevTools.frontend_url(target, port, token, wk)
     Host.log(:info, "attach #{target["id"]} (#{target["url"].to_s[0, 60]})")
+    @attached_target = target["id"].to_s
     Host.emit("devtools.open", "url" => fe, "target" => target["id"])
   rescue => e
     Host.emit("devtools.error", "text" => "#{e.class}: #{e.message}")
@@ -237,3 +240,67 @@ App.on("billing.purchased") do |ev|
 end
 App.on("billing.cancelled") { |_| }
 App.on("billing.error")     { |ev| Host.toast("Play Billing: #{ev["text"]}") }
+
+# ---- context menu (right-click / long-press on a page) ----
+# Java sends what is under the pointer; Ruby decides the items; the chrome renders them.
+App.on("context.menu") do |ev|
+  items = []
+  type = ev["type"].to_s
+  link = ev["link"].to_s
+  src  = ev["src"].to_s
+  if type.start_with?("link")
+    items << ["open_tab", "Open link in new tab"] << ["copy_link", "Copy link address"] << ["copy_link_text", "Copy link text"]
+    items << :hr
+  end
+  if type == "image" || type == "link_image"
+    items << ["open_image", "Open image in new tab"] << ["copy_image", "Copy image address"] << :hr
+  end
+  items << ["copy_sel", "Copy"] << ["search_sel", "Search the web for selection"] << :hr unless type.start_with?("link") || type == "image"
+  items << ["back", "Back"] if ev["can_back"]
+  items << ["forward", "Forward"] if ev["can_forward"]
+  items << ["reload", "Reload"] << :hr << ["inspect", "Inspect element"]
+  Host.emit("ui.context", "x" => ev["x"], "y" => ev["y"],
+            "items" => items.map { |i| i == :hr ? { "hr" => true } : { "id" => i[0], "label" => i[1] } },
+            "target" => { "tab" => ev["tab"], "type" => type, "link" => link, "src" => src, "css_x" => ev["css_x"], "css_y" => ev["css_y"] })
+end
+
+App.on("context.action") do |ev|
+  t = ev["target"] || {}
+  tab = t["tab"]
+  br = b.call
+  case ev["id"].to_s
+  when "open_tab"       then br.new_tab(t["link"], select: false)
+  when "copy_link"      then Host.emit("clipboard.set", "label" => "Link", "text" => t["link"])
+  when "copy_link_text" then Host.emit("tab.selection", "tab" => tab, "purpose" => "copy")   # best effort: selected text
+  when "open_image"     then br.new_tab(t["src"], select: false)
+  when "copy_image"     then Host.emit("clipboard.set", "label" => "Image", "text" => t["src"])
+  when "copy_sel"       then Host.emit("tab.selection", "tab" => tab, "purpose" => "copy")
+  when "search_sel"     then Host.emit("tab.selection", "tab" => tab, "purpose" => "search")
+  when "back"           then br.nav(tab, "back")
+  when "forward"        then br.nav(tab, "forward")
+  when "reload"         then br.nav(tab, "reload")
+  when "inspect"        then App.inspect_at(tab, t["css_x"], t["css_y"])
+  end
+end
+
+App.on("page.selection") do |ev|
+  text = ev["text"].to_s
+  case ev["purpose"]
+  when "copy"   then Host.emit("clipboard.set", "label" => "Text", "text" => text) unless text.empty?
+  when "search" then b.call.new_tab(UrlNorm.normalize(text, b.call.settings["search"])) unless text.strip.empty?
+  end
+end
+
+module App
+  # "Inspect element" — Phase A: open DevTools on the tab. Phase B (Inspector module) reveals the node.
+  def self.inspect_at(tab, css_x, css_y)
+    br = browser
+    br.select_tab(tab) if br.current.nil? || br.current.id != tab.to_i
+    unless br.devtools_open
+      br.toggle_devtools
+    end
+    if defined?(Inspector)
+      Inspector.reveal(css_x.to_f, css_y.to_f)
+    end
+  end
+end

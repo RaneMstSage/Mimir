@@ -4,6 +4,8 @@ lib/loop.rb
 lib/http.rb
 lib/devtools.rb
 lib/relay.rb
+lib/cdp.rb
+lib/inspector.rb
 lib/urlnorm.rb
 lib/settings.rb
 lib/bookmarks.rb

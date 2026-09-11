@@ -203,3 +203,15 @@ test "every event the chrome UI sends has a Ruby handler" do
   missing = (names.uniq - handled_locally_by_java).reject { |n| App.handlers.key?(n) }
   assert missing.empty?, "UI sends events with no Ruby handler: #{missing.inspect}"
 end
+
+test "context menu items depend on the hit target and actions route correctly" do
+  Inspect.emitted.clear
+  App.handle({ "ev" => "context.menu", "tab" => 1, "type" => "link", "link" => "https://l.test/", "src" => "", "x" => 10, "y" => 20, "css_x" => 5, "css_y" => 6, "can_back" => true, "can_forward" => false }.to_json)
+  ctx = Inspect.emitted.find { |c| c["cmd"] == "ui.context" }
+  ids = ctx["items"].map { |i| i["id"] }.compact
+  assert ids.include?("open_tab") && ids.include?("copy_link") && ids.include?("inspect") && ids.include?("back") && !ids.include?("forward"), ids.inspect
+  Inspect.emitted.clear
+  App.handle({ "ev" => "context.action", "id" => "copy_link", "target" => ctx["target"] }.to_json)
+  clip = Inspect.emitted.find { |c| c["cmd"] == "clipboard.set" }
+  assert_equal "https://l.test/", clip["text"]
+end

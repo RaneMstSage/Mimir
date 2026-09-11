@@ -127,3 +127,10 @@ select,.row input[type=text],.row input[type=number]{background:var(--field);col
   .row input[type=text]{width:100%;min-width:0}
   .grid2{grid-template-columns:1fr}
 }
+
+/* ---- page context menu (right-click / long-press) ---- */
+#ctx{position:fixed;background:#1e293b;border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 30px #000a;z-index:30;min-width:230px;padding:6px 0}
+#ctx .m{display:block;width:100%;text-align:left;padding:9px 16px;color:var(--fg);font-size:14px}
+#ctx .m:active{background:#334155}
+#ctx .m.strong{color:var(--acc);font-weight:600}
+#ctx hr{border:0;border-top:1px solid var(--line);margin:4px 0}

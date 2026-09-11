@@ -46,13 +46,31 @@ class Relay
   def forget(conn) ; @conns.delete(conn) ; end
   def connections  ; @conns.size ; end
 
+  # The relayed connection carrying the DevTools frontend for a page target (most recent wins).
+  def frontend_conn_for(target_id)
+    @conns.reverse.find { |c| c.path.to_s.end_with?("/devtools/page/#{target_id}") }
+  end
+
   def close
     @conns.dup.each(&:close)
     @server.close rescue nil
   end
 
+  # Unmasked server->client text frame.
+  def self.server_text_frame(text)
+    len = text.bytesize
+    hdr = [0x81]
+    if len < 126 then hdr << len
+    elsif len < 65_536 then hdr << 126 << (len >> 8) << (len & 0xff)
+    else hdr << 127 ; 7.downto(0) { |i| hdr << ((len >> (8 * i)) & 0xff) }
+    end
+    hdr.pack("C*") + text
+  end
+
   # Rewrite the client's HTTP head: validate + strip the token from the request path, drop
   # Origin and Host, add our own Host. Returns the new head or nil if the token is missing.
+  attr_reader :last_path
+
   def rewrite_head(head)
     lines = head.split("\r\n")
     req = lines.shift.to_s
@@ -61,6 +79,7 @@ class Relay
     prefix = "/#{@token}/"
     return nil unless parts[1].start_with?(prefix)
     parts[1] = "/" + parts[1][prefix.size..-1]
+    @last_path = parts[1]
     out = [parts.join(" ")]
     lines.each do |l|
       next if l.empty?
@@ -74,10 +93,16 @@ class Relay
 
   # -- One relayed connection ----------------------------------------------------------------
   class Conn
+    attr_reader :path
+
     def initialize(relay, client)
       @relay = relay
       @client = client
       @upstream = nil
+      @path = nil
+      @frame_left = 0      # bytes still owed to the current upstream->client WebSocket frame
+      @hdr = ""            # partial frame header bytes (upstream->client)
+      @inject = []         # server->client frames waiting for a frame boundary
       @state = :head
       @head = ""
       @to_up = []      # chunks waiting to be written to upstream
@@ -146,6 +171,7 @@ class Relay
           return close
         end
         rest = @head[(sep + 4)..-1].to_s
+        @path = @relay.last_path
         connect_upstream
         @to_up << rewritten
         @to_up << rest unless rest.empty?
@@ -165,8 +191,29 @@ class Relay
       close
     end
 
+    public
+
+    def piping? ; @state == :piping && @upstream ; end
+
+    # Queue a text frame for the frontend; written at the next frame boundary so it never lands
+    # inside a frame coming from the page.
+    def inject_to_client(text)
+      @inject << Relay.server_text_frame(text)
+      flush_injections
+    end
+
+    def flush_injections
+      return unless @frame_left == 0 && @hdr.empty?
+      @to_client.concat(@inject) ; @inject.clear
+    end
+
+    private
+
     def read_upstream
-      @to_client << @upstream.sysread(CHUNK)
+      data = @upstream.sysread(CHUNK)
+      track_frames(data)
+      @to_client << data
+      flush_injections
     rescue EOFError
       @up_eof = true
       if @to_client.empty? && !@client_shut
@@ -177,6 +224,41 @@ class Relay
     rescue Errno::EAGAIN, Errno::EWOULDBLOCK
     rescue Errno::ECONNRESET, Errno::EPIPE, IOError
       close
+    end
+
+    # Walk WebSocket frame headers in the upstream->client stream to know where frames end.
+    def track_frames(data)
+      i = 0
+      n = data.bytesize
+      while i < n
+        if @frame_left > 0
+          take = [@frame_left, n - i].min
+          @frame_left -= take ; i += take
+          next
+        end
+        @hdr << data.byteslice(i, n - i)
+        need = header_size(@hdr)
+        if need.nil? || @hdr.bytesize < need
+          # header incomplete; keep what we have (it all belongs to the header), consume the rest
+          return
+        end
+        b1 = @hdr.getbyte(1) ; len = b1 & 0x7f
+        len = @hdr.byteslice(2, 2).unpack1("n") if len == 126
+        len = @hdr.byteslice(2, 8).unpack1("Q>") if len == 127
+        len += 4 if (b1 & 0x80) != 0          # masked (never from a server, but be safe)
+        consumed_from_data = need - (@hdr.bytesize - (n - i))   # header bytes taken from this chunk
+        i += consumed_from_data
+        @frame_left = len
+        @hdr = ""
+      end
+    end
+
+    # Bytes a frame header needs given what we have so far (nil if we can't tell yet).
+    def header_size(h)
+      return nil if h.bytesize < 2
+      b1 = h.getbyte(1) ; len = b1 & 0x7f
+      base = len == 126 ? 4 : (len == 127 ? 10 : 2)
+      base
     end
 
     def connect_upstream
