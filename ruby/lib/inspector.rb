@@ -7,6 +7,7 @@ module Inspector
     target_id = App.attached_target
     relay = App.relay
     conn = relay && target_id ? relay.frontend_conn_for(target_id) : nil
+    Host.log(:info, "inspect: attempt=#{attempts} target=#{target_id.inspect} conn=#{conn ? 'yes' : 'no'} piping=#{conn && conn.piping?} at #{css_x.round},#{css_y.round}")
     if target_id.nil? || conn.nil? || !conn.piping?
       # DevTools may still be connecting (we may have just opened it); retry a few times.
       if attempts < 12
@@ -21,6 +22,7 @@ module Inspector
       c.call("DOM.getDocument", { "depth" => 0 })
       c.call("DOM.getNodeForLocation", { "x" => css_x.round, "y" => css_y.round, "includeUserAgentShadowDOM" => false })
     end
+    Host.log(:info, "inspect: node=#{node.inspect[0, 160]}")
     backend_id = node["backendNodeId"]
     unless backend_id
       Host.emit("status", "text" => "Inspect: no element at that point")

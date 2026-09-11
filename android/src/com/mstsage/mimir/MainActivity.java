@@ -169,14 +169,32 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
     }
 
     @Override
-    public boolean onKeyDown(int keyCode, KeyEvent event) {
-        // A mouse BACK button often arrives as KEYCODE_BACK from SOURCE_MOUSE; treat it as tab-back.
-        if (keyCode == KeyEvent.KEYCODE_BACK && event.getSource() != 0
-                && (event.getSource() & android.view.InputDevice.SOURCE_MOUSE) == android.view.InputDevice.SOURCE_MOUSE) {
-            WebView w = tabs.get(currentTab);
-            if (w != null && w.canGoBack()) { w.goBack(); return true; }
+    public boolean dispatchKeyEvent(KeyEvent event) {
+        int kc = event.getKeyCode();
+        boolean mouse = (event.getSource() & android.view.InputDevice.SOURCE_MOUSE) == android.view.InputDevice.SOURCE_MOUSE;
+        if (event.getAction() == KeyEvent.ACTION_DOWN && (kc == KeyEvent.KEYCODE_BACK || kc == KeyEvent.KEYCODE_FORWARD)) {
+            ruby.appendLog("[key] " + KeyEvent.keyCodeToString(kc) + " src=" + event.getSource() + " mouse=" + mouse);
         }
-        return super.onKeyDown(keyCode, event);
+        if (event.getAction() == KeyEvent.ACTION_DOWN) {
+            WebView w = tabs.get(currentTab);
+            if (kc == KeyEvent.KEYCODE_FORWARD && w != null) { if (w.canGoForward()) w.goForward(); return true; }
+            if (kc == KeyEvent.KEYCODE_BACK && mouse && w != null && w.canGoBack()) { w.goBack(); return true; }
+        }
+        return super.dispatchKeyEvent(event);
+    }
+
+    @Override
+    public boolean dispatchGenericMotionEvent(MotionEvent ev) {
+        if (ev.getActionMasked() == MotionEvent.ACTION_BUTTON_PRESS) {
+            int b = ev.getActionButton();
+            ruby.appendLog("[mouse-activity] button=" + b + " src=" + ev.getSource());
+            WebView w = tabs.get(currentTab);
+            if (w != null) {
+                if (b == MotionEvent.BUTTON_BACK)    { if (w.canGoBack()) w.goBack(); return true; }
+                if (b == MotionEvent.BUTTON_FORWARD) { if (w.canGoForward()) w.goForward(); return true; }
+            }
+        }
+        return super.dispatchGenericMotionEvent(ev);
     }
 
     @Override
@@ -369,6 +387,7 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
             lastPointer[0] = ev.getX(); lastPointer[1] = ev.getY();
             if (ev.getActionMasked() == MotionEvent.ACTION_BUTTON_PRESS) {
                 int b = ev.getActionButton();
+                ruby.appendLog("[mouse] button_press button=" + b + " src=" + ev.getSource());
                 if (b == MotionEvent.BUTTON_SECONDARY || b == MotionEvent.BUTTON_STYLUS_PRIMARY) { contextMenu(w, id); return true; }
                 if (b == MotionEvent.BUTTON_BACK)    { if (w.canGoBack()) w.goBack(); return true; }
                 if (b == MotionEvent.BUTTON_FORWARD) { if (w.canGoForward()) w.goForward(); return true; }
