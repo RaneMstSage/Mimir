@@ -302,15 +302,13 @@ App.on("page.selection") do |ev|
 end
 
 module App
-  # "Inspect element" — Phase A: open DevTools on the tab. Phase B (Inspector module) reveals the node.
+  # "Inspect element": open DevTools on the tab, then turn on the frontend's inspect cursor and
+  # point it at where the user right-clicked. Java drives the DevTools WebView directly — no second
+  # protocol connection (WebView allows one) and no splicing into the relay stream.
   def self.inspect_at(tab, css_x, css_y)
     br = browser
     br.select_tab(tab) if br.current.nil? || br.current.id != tab.to_i
-    unless br.devtools_open
-      br.toggle_devtools
-    end
-    if defined?(Inspector)
-      Inspector.reveal(css_x.to_f, css_y.to_f)
-    end
+    br.toggle_devtools unless br.devtools_open
+    Host.emit("devtools.inspect", "x" => css_x, "y" => css_y)
   end
 end

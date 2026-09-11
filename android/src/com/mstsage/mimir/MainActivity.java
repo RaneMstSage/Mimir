@@ -267,6 +267,7 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
                 }
                 case "dev.toggle": toggleRubyPane(); break;
                 case "devtools.dock": openDevtools(cmd.optString("side", "right"), (float) cmd.optDouble("fraction", 0.45)); break;
+                case "devtools.inspect": enterInspectMode((float) cmd.optDouble("x", 0), (float) cmd.optDouble("y", 0)); break;
                 case "devtools.open": {
                     String fe = cmd.optString("url");
                     status("target " + cmd.optString("target") + " -> " + fe);
@@ -681,6 +682,31 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
             devtoolsContainer.addView(devtoolsView, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         }
         applyDock();
+    }
+
+    // Turn on the DevTools inspect cursor (Ctrl+Shift+C in the frontend), then simulate a tap on the
+    // page at the given CSS point so the target reveals that node in the Elements panel — exactly
+    // what desktop "right-click → Inspect element" does.
+    private void enterInspectMode(float cssX, float cssY) {
+        if (devtoolsView == null) return;
+        final WebView page = tabs.get(currentTab);
+        String js = "(function(){try{['keydown','keyup'].forEach(function(t){document.dispatchEvent(new KeyboardEvent(t,{key:'C',code:'KeyC',keyCode:67,which:67,ctrlKey:true,shiftKey:true,bubbles:true}));});return 'ok';}catch(e){return 'err:'+e;}})()";
+        devtoolsView.evaluateJavascript(js, r -> {
+            appendRubyLog("[inspect] mode=" + r);
+            if (page == null) return;
+            float density = getResources().getDisplayMetrics().density;
+            float scale = page.getScale() == 0 ? density : page.getScale();
+            final float vx = cssX * scale, vy = cssY * scale;   // CSS px -> view px
+            main.postDelayed(() -> tapPage(page, vx, vy), 250);
+        });
+    }
+
+    private void tapPage(WebView page, float x, float y) {
+        long t = android.os.SystemClock.uptimeMillis();
+        MotionEvent down = MotionEvent.obtain(t, t, MotionEvent.ACTION_DOWN, x, y, 0);
+        MotionEvent up = MotionEvent.obtain(t, t + 40, MotionEvent.ACTION_UP, x, y, 0);
+        page.dispatchTouchEvent(down); page.dispatchTouchEvent(up);
+        down.recycle(); up.recycle();
     }
 
     private void closeDevtools() {
