@@ -446,9 +446,9 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
     private void tune(WebView w, boolean desktop) {
         try {
             Object r = Class.forName("com.mstsage.mimir.WebViewTuning").getMethod("apply", WebView.class, boolean.class).invoke(null, w, desktop);
-            if (!tuningReported && r != null) { tuningReported = true; appendRubyLog("[webview] " + r); }
+            if (!tuningReported && r != null) { tuningReported = true; ruby.appendLog("[webview] " + r); status(String.valueOf(r)); }
         } catch (Throwable t) {
-            if (!tuningReported) { tuningReported = true; appendRubyLog("[webview] tuning unavailable in this build"); }
+            if (!tuningReported) { tuningReported = true; ruby.appendLog("[webview] tuning unavailable in this build"); }
         }
     }
 

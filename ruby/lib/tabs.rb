@@ -237,7 +237,7 @@ class Browser
       "scripts" => @scripts ? @scripts.list : [],
       "billing" => @billing,
       "blocks" => @scripts ? @scripts.blocks : [],
-      "version" => { "app" => App::VERSION, "ruby" => Inspect.version, "donate" => (App.boot || {})["donate_url"].to_s, "source" => (App.boot || {})["source_url"].to_s },
+      "version" => { "app" => ((App.boot || {})["app_version"] || App::VERSION), "ruby" => Inspect.version, "donate" => (App.boot || {})["donate_url"].to_s, "source" => (App.boot || {})["source_url"].to_s },
       "devtools" => { "open" => @devtools_open, "side" => @settings["dock_side"], "fraction" => @settings["dock_fraction"] }
     }
   end

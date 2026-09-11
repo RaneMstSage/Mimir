@@ -10,6 +10,7 @@ module App
   @relay = nil
 
   def self.on(event, &blk) ; @handlers[event] = blk ; end
+  def self.handlers ; @handlers ; end
   def self.relay   ; @relay ; end
   def self.boot    ; @boot ; end
   def self.browser ; @browser ; end
@@ -208,3 +209,31 @@ App.on("dock.toggle")   { |_| b.call.toggle_dock }
 App.on("dock.fraction") { |ev| b.call.set_dock_fraction(ev["fraction"]) }
 App.on("ua.toggle")     { |_| b.call.toggle_ua }
 App.on("intent.url")    { |ev| b.call.new_tab(ev["url"]) }
+
+# ---- pages, donate, support / tip jar (Java answers billing.* events) ----
+App.on("settings.open") { |_| Host.emit("status", "text" => "Settings: ⋮ menu → Settings") }
+App.on("about")         { |_| Host.toast("Mímir #{App.boot["app_version"] || App::VERSION} — mruby #{Inspect.version}") }
+App.on("donate")        { |_| u = App.boot["donate_url"].to_s ; b.call.new_tab(u) unless u.empty? }
+App.on("support.open")  { |_| Host.emit("billing.query") }
+App.on("billing.buy")   { |ev| Host.emit("billing.buy", "product" => ev["product"].to_s) }
+App.on("billing.ready") do |ev|
+  br = b.call
+  br.billing["status"] = "ready"
+  br.billing["products"] = (ev["products"] || [])
+  br.billing["reason"] = ""
+  br.push_state
+end
+App.on("billing.unavailable") do |ev|
+  br = b.call
+  br.billing["status"] = "unavailable"
+  br.billing["reason"] = ev["reason"].to_s
+  br.push_state
+end
+App.on("billing.purchased") do |ev|
+  br = b.call
+  br.billing["thanks"] = true
+  Host.toast("Thank you for supporting Mímir!")
+  br.push_state
+end
+App.on("billing.cancelled") { |_| }
+App.on("billing.error")     { |ev| Host.toast("Play Billing: #{ev["text"]}") }

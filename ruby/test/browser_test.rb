@@ -182,3 +182,24 @@ test "Browser: page events inject matching scripts" do
   inj = Inspect.emitted.find { |c| c["cmd"] == "tab.inject" }
   assert inj && inj["js"].include?("1+1"), "expected tab.inject"
 end
+
+test "every event the chrome UI sends has a Ruby handler" do
+  ui = File.read(File.expand_path("../../ui/ui.rb", __FILE__))
+  names = []
+  # send("name" ...) occurrences
+  pos = 0
+  while (i = ui.index('send("', pos))
+    j = ui.index('"', i + 6)
+    names << ui[(i + 6)...j] if j
+    pos = i + 6
+  end
+  # `when "a", "b", ... then send(act)` forwards the literal act names
+  ui.split("\n").each do |line|
+    next unless line.include?("then send(act)")
+    parts = line.split('"')
+    parts.each_with_index { |p, k| names << p if k.odd? }
+  end
+  handled_locally_by_java = %w[chrome.height chrome.ready ui.error ui.debug]
+  missing = (names.uniq - handled_locally_by_java).reject { |n| App.handlers.key?(n) }
+  assert missing.empty?, "UI sends events with no Ruby handler: #{missing.inspect}"
+end
