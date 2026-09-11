@@ -5,10 +5,12 @@ import android.webkit.WebView;
 
 import androidx.webkit.UserAgentMetadata;
 import androidx.webkit.WebSettingsCompat;
+import androidx.webkit.WebViewCompat;
 import androidx.webkit.WebViewFeature;
 
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
 
 /**
  * Makes Mímir's pages look like the Chrome they run on, instead of "an embedded WebView".
@@ -28,12 +30,30 @@ public final class WebViewTuning {
         return ua.substring(i + 7, j < 0 ? ua.length() : j);
     }
 
-    public static void apply(WebView w, boolean desktop) {
+    /** Minimal window.chrome so "is this Chrome?" checks pass; real Chrome exposes these members. */
+    static final String CHROME_SHIM =
+            "(function(){if(!window.chrome){var c={app:{isInstalled:false,InstallState:{DISABLED:'disabled',INSTALLED:'installed',NOT_INSTALLED:'not_installed'},RunningState:{CANNOT_RUN:'cannot_run',READY_TO_RUN:'ready_to_run',RUNNING:'running'},getDetails:function(){return null},getIsInstalled:function(){return false},runningState:function(){return 'cannot_run'}},"
+            + "runtime:{OnInstalledReason:{},OnRestartRequiredReason:{},PlatformArch:{},PlatformOs:{},RequestUpdateCheckStatus:{},connect:function(){},sendMessage:function(){},id:undefined},"
+            + "loadTimes:function(){return {}},csi:function(){return {}}};"
+            + "Object.defineProperty(window,'chrome',{value:c,writable:true,configurable:true,enumerable:true});}})();";
+
+    /** Applies everything and returns a one-line report for the in-app log. */
+    public static String apply(WebView w, boolean desktop) {
+        StringBuilder report = new StringBuilder("tuning:");
         try {
             if (WebViewFeature.isFeatureSupported(WebViewFeature.REQUESTED_WITH_HEADER_ALLOW_LIST)) {
                 // Never send X-Requested-With: <package> (the classic WebView tell).
-                WebSettingsCompat.setRequestedWithHeaderOriginAllowList(w.getSettings(), Collections.emptySet());
-            }
+                try {
+                    WebSettingsCompat.setRequestedWithHeaderOriginAllowList(w.getSettings(), new HashSet<String>());
+                    report.append(" xrw=off");
+                } catch (Throwable t) { report.append(" xrw=ERR(" + t.getClass().getSimpleName() + ")"); }
+            } else report.append(" xrw=unsupported");
+            if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
+                try {
+                    WebViewCompat.addDocumentStartJavaScript(w, CHROME_SHIM, new HashSet<>(Collections.singletonList("*")));
+                    report.append(" chrome-shim=on");
+                } catch (Throwable t) { report.append(" chrome-shim=ERR(" + t.getClass().getSimpleName() + ")"); }
+            } else report.append(" chrome-shim=unsupported");
             if (WebViewFeature.isFeatureSupported(WebViewFeature.USER_AGENT_METADATA)) {
                 String full = chromiumVersion(w);
                 String major = full.contains(".") ? full.substring(0, full.indexOf('.')) : full;
@@ -52,9 +72,11 @@ public final class WebViewTuning {
                         .setWow64(false)
                         .build();
                 WebSettingsCompat.setUserAgentMetadata(w.getSettings(), md);
-            }
+                report.append(" hints=chrome/" + full);
+            } else report.append(" hints=unsupported");
         } catch (Throwable t) {
-            android.util.Log.w("Mimir", "WebView tuning unavailable: " + t);
+            report.append(" ERR " + t);
         }
+        return report.toString();
     }
 }

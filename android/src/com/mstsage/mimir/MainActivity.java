@@ -440,11 +440,16 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
         }
     }
 
+    private boolean tuningReported = false;
+
     /** Present pages as Chrome rather than an embedded WebView (Gradle builds only; no-op otherwise). */
-    private static void tune(WebView w, boolean desktop) {
+    private void tune(WebView w, boolean desktop) {
         try {
-            Class.forName("com.mstsage.mimir.WebViewTuning").getMethod("apply", WebView.class, boolean.class).invoke(null, w, desktop);
-        } catch (Throwable ignored) {}
+            Object r = Class.forName("com.mstsage.mimir.WebViewTuning").getMethod("apply", WebView.class, boolean.class).invoke(null, w, desktop);
+            if (!tuningReported && r != null) { tuningReported = true; appendRubyLog("[webview] " + r); }
+        } catch (Throwable t) {
+            if (!tuningReported) { tuningReported = true; appendRubyLog("[webview] tuning unavailable in this build"); }
+        }
     }
 
     /** The chrome renders Ruby's snapshot; nothing native to update besides the pane state. */
