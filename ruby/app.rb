@@ -308,7 +308,8 @@ module App
   def self.inspect_at(tab, css_x, css_y)
     br = browser
     br.select_tab(tab) if br.current.nil? || br.current.id != tab.to_i
-    br.toggle_devtools unless br.devtools_open
-    Host.emit("devtools.inspect", "x" => css_x, "y" => css_y)
+    fresh = !br.devtools_open
+    br.toggle_devtools if fresh
+    Host.emit("devtools.inspect", "x" => css_x, "y" => css_y, "fresh" => fresh)
   end
 end

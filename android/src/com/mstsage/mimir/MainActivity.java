@@ -282,7 +282,7 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
                 }
                 case "dev.toggle": toggleRubyPane(); break;
                 case "devtools.dock": openDevtools(cmd.optString("side", "right"), (float) cmd.optDouble("fraction", 0.45)); break;
-                case "devtools.inspect": enterInspectMode((float) cmd.optDouble("x", 0), (float) cmd.optDouble("y", 0)); break;
+                case "devtools.inspect": enterInspectMode((float) cmd.optDouble("x", 0), (float) cmd.optDouble("y", 0), cmd.optBoolean("fresh", false)); break;
                 case "devtools.open": {
                     String fe = cmd.optString("url");
                     status("target " + cmd.optString("target") + " -> " + fe);
@@ -699,18 +699,18 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
     // Turn on the DevTools inspect cursor (Ctrl+Shift+C in the frontend), then simulate a tap on the
     // page at the given CSS point so the target reveals that node in the Elements panel — exactly
     // what desktop "right-click → Inspect element" does.
-    private void enterInspectMode(float cssX, float cssY) {
+    private void enterInspectMode(float cssX, float cssY, boolean fresh) {
         if (devtoolsView == null) return;
         final WebView page = tabs.get(currentTab);
+        if (page == null) return;
+        float density = getResources().getDisplayMetrics().density;
+        float scale = page.getScale() == 0 ? density : page.getScale();
+        final float vx = cssX * scale, vy = cssY * scale;   // CSS px -> view px
         String js = "(function(){try{['keydown','keyup'].forEach(function(t){document.dispatchEvent(new KeyboardEvent(t,{key:'C',code:'KeyC',keyCode:67,which:67,ctrlKey:true,shiftKey:true,bubbles:true}));});return 'ok';}catch(e){return 'err:'+e;}})()";
-        devtoolsView.evaluateJavascript(js, r -> {
-            appendRubyLog("[inspect] mode=" + r);
-            if (page == null) return;
-            float density = getResources().getDisplayMetrics().density;
-            float scale = page.getScale() == 0 ? density : page.getScale();
-            final float vx = cssX * scale, vy = cssY * scale;   // CSS px -> view px
-            main.postDelayed(() -> tapPage(page, vx, vy), 250);
-        });
+        // If DevTools was already open, the frontend is loaded and inspect mode engages almost
+        // immediately; only a freshly opened pane needs time for the CDN frontend to load.
+        Runnable fire = () -> devtoolsView.evaluateJavascript(js, r -> main.postDelayed(() -> tapPage(page, vx, vy), fresh ? 250 : 60));
+        if (fresh) main.postDelayed(fire, 500); else fire.run();
     }
 
     private void tapPage(WebView page, float x, float y) {
