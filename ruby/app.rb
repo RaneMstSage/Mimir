@@ -313,3 +313,8 @@ module App
     Host.emit("devtools.inspect", "x" => css_x, "y" => css_y, "fresh" => fresh)
   end
 end
+
+# ---- local files & folders (served by Java at https://local.mimir/<path>) ----
+App.on("folder.open")     { |_| Host.emit("folder.pick") }
+App.on("folder.release")  { |ev| Host.emit("folder.release", "path" => ev["path"].to_s) }
+App.on("folders.changed") { |ev| b.call.folders = (ev["folders"] || []) ; b.call.push_state }

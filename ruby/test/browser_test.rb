@@ -223,3 +223,24 @@ test "context menu items depend on the hit target and actions route correctly" d
   clip = Inspect.emitted.find { |c| c["cmd"] == "clipboard.set" }
   assert_equal "https://l.test/", clip["text"]
 end
+
+test "UrlNorm maps paths and file:// URLs to the local origin" do
+  assert_equal "https://local.mimir/data/data/com.termux/files/home/Projects/site/index.html",
+               UrlNorm.normalize("/data/data/com.termux/files/home/Projects/site/index.html")
+  assert_equal "https://local.mimir/data/x/My%20Site/", UrlNorm.normalize("/data/x/My Site/")
+  assert_equal "https://local.mimir/storage/emulated/0/Download/a.html", UrlNorm.normalize("file:///storage/emulated/0/Download/a.html")
+  assert_equal "https://local.mimir/", UrlNorm.normalize("/")
+  assert_equal "https://example.com", UrlNorm.normalize("example.com")       # unchanged behaviour
+end
+
+test "folder events reach Java and folders appear in state" do
+  App.instance_variable_set(:@browser, Browser.new(Settings.new(nil), Bookmarks.new(nil)))
+  Inspect.emitted.clear
+  App.handle({ "ev" => "folder.open" }.to_json)
+  assert Inspect.emitted.any? { |c| c["cmd"] == "folder.pick" }
+  App.handle({ "ev" => "folders.changed", "folders" => [{ "path" => "/data/data/com.termux/files/home", "label" => "Termux home" }] }.to_json)
+  st = Inspect.emitted.reverse.find { |c| c["cmd"] == "ui.state" }["state"]
+  assert_equal "Termux home", st["folders"][0]["label"]
+  App.handle({ "ev" => "folder.release", "path" => "/data/data/com.termux/files/home" }.to_json)
+  assert Inspect.emitted.any? { |c| c["cmd"] == "folder.release" && c["path"] == "/data/data/com.termux/files/home" }
+end

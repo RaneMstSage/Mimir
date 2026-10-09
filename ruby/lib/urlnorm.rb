@@ -9,9 +9,13 @@ module UrlNorm
   }
   SAFE = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_.~"
 
+  LOCAL = "https://local.mimir"
+
   def self.normalize(text, engine = "google")
     q = text.to_s.strip
     return nil if q.empty?
+    return local(q[7..-1]) if q.start_with?("file://")       # file:///path -> served from a granted folder
+    return local(q) if q.start_with?("/")                     # absolute path typed in the omnibox
     return q if scheme?(q)
     return "https://#{q}" if hostish?(q)
     (ENGINES[engine] || SEARCH) + encode(q)
@@ -36,6 +40,25 @@ module UrlNorm
     return false if host.start_with?(".") || host.end_with?(".")
     tld = host.split(".").last.to_s
     tld.size >= 2 && tld.each_char.all? { |c| letter?(c) || digit?(c) }
+  end
+
+  # https://local.mimir/<percent-encoded absolute path>; a trailing slash is kept for folders.
+  def self.local(path)
+    segs = path.split("/").reject(&:empty?)
+    out = LOCAL + "/" + segs.map { |seg| encode_segment(seg) }.join("/")
+    out += "/" if path.end_with?("/") && !segs.empty?
+    out
+  end
+
+  def self.encode_segment(s)
+    out = ""
+    s.each_byte do |b|
+      c = b.chr
+      if SAFE.include?(c) then out << c
+      else out << format("%%%02X", b)
+      end
+    end
+    out
   end
 
   def self.encode(s)

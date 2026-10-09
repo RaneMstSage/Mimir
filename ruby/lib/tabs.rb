@@ -17,12 +17,14 @@ class Browser
   attr_accessor :devtools_open
 
   attr_reader :billing
+  attr_accessor :folders      # local folders Mímir has been granted ([{path,label}], from Java)
 
   def initialize(settings, bookmarks = nil, scripts = nil)
     @settings = settings
     @bookmarks = bookmarks
     @scripts = scripts
     @billing = { "status" => "unknown", "products" => [], "thanks" => false, "reason" => "" }
+    @folders = []
     @tabs = []
     @current = nil
     @next_id = 1
@@ -236,6 +238,7 @@ class Browser
       "settings" => @settings.to_h,
       "scripts" => @scripts ? @scripts.list : [],
       "billing" => @billing,
+      "folders" => @folders,
       "blocks" => @scripts ? @scripts.blocks : [],
       "version" => { "app" => ((App.boot || {})["app_version"] || App::VERSION), "ruby" => Inspect.version, "donate" => (App.boot || {})["donate_url"].to_s, "source" => (App.boot || {})["source_url"].to_s },
       "devtools" => { "open" => @devtools_open, "side" => @settings["dock_side"], "fraction" => @settings["dock_fraction"] }
