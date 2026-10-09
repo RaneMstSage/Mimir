@@ -72,4 +72,5 @@ Design target: what a modern desktop browser does, in a compact dark theme.
 - [x] Ruby: omnibox paths → local origin, folder.open / folder.release / folders.changed, tests
 - [x] UI: ⋮ → Open folder…, Settings → Folders Mímir can open (Remove), jsdom checks
 - [x] bin/mimir thin launcher (path extra, no servers), README + CONTRIBUTING
-- [ ] Device verification with ~/Projects/demo (styled page, ES module, fetch, reload, DevTools, listing, revoke)
+- [x] Device verified: ~/Projects/demo renders (relative CSS, ES module, fetch) via Termux home grant
+- [x] Pre-picker prompt naming the folder + where to tap (Termux provider lacks findDocumentPath, so the picker can't jump into it)

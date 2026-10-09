@@ -187,10 +187,27 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
     // ---- local folders: one-time grant through Android's folder picker ----
     private void requestGrant(String path, int tabId) {
         if (pickerOpen) return;
+        pickerOpen = true;    // also blocks repeat prompts while the dialog is up
         pendingGrantPath = path;
         pendingGrantTab = tabId;
-        status("Choose “Use this folder” so Mímir can open files there (one time)");
-        launchPicker(FolderAccess.initialUriFor(path));
+        boolean termux = path.startsWith("/data/data/com.termux/");
+        // Folder holding the requested item (a path ending in a file name points at its folder).
+        String last = path.substring(path.lastIndexOf('/') + 1);
+        String folder = last.contains(".") ? path.substring(0, Math.max(1, path.lastIndexOf('/'))) : path;
+        String msg = termux
+                ? "Mímir needs permission to open files in:\n\n" + folder + "\n\nAndroid will show its folder picker. Tap ☰ (top left) → Termux → open “home” → Use this folder.\n\nGranting home once covers every project under it."
+                : "Mímir needs permission to open files in:\n\n" + folder + "\n\nAndroid will show its folder picker at that folder. Tap “Use this folder”.";
+        new android.app.AlertDialog.Builder(this)
+                .setTitle("Allow folder access")
+                .setMessage(msg)
+                .setPositiveButton("Continue", (d, w) -> {
+                    pickerOpen = false;
+                    launchPicker(termux ? FolderAccess.initialUriFor(path)
+                            : android.provider.DocumentsContract.buildDocumentUri(FolderAccess.EXTERNAL, FolderAccess.pathToDocId(FolderAccess.EXTERNAL, FolderAccess.normalize(folder))));
+                })
+                .setNegativeButton("Cancel", (d, w) -> { pickerOpen = false; pendingGrantPath = null; pendingGrantTab = -1; status("Folder access not granted"); })
+                .setOnCancelListener(d -> { pickerOpen = false; pendingGrantPath = null; pendingGrantTab = -1; })
+                .show();
     }
 
     private void launchPicker(Uri initial) {
