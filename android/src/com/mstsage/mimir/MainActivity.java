@@ -60,6 +60,9 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
     private String pendingGrantPath = null;
     private int pendingGrantTab = -1;
     private boolean pickerOpen = false;
+    private boolean awaitingPicker = false;
+    private String pendingAllFilesPath = null;
+    private int pendingAllFilesTab = -1;
     private final RubyRuntime ruby = RubyRuntime.get();
     private final Map<Integer, WebView> tabs = new HashMap<>();
     private int currentTab = -1;
@@ -186,6 +189,8 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
 
     // ---- local folders: one-time grant through Android's folder picker ----
     private void requestGrant(String path, int tabId) {
+        // Shared storage in non-Play builds: ask once for "All files access", like termux-setup-storage.
+        if (FolderAccess.isSharedStorage(path) && canAskAllFiles()) { requestAllFiles(path, tabId); return; }
         if (pickerOpen) return;
         pickerOpen = true;    // also blocks repeat prompts while the dialog is up
         pendingGrantPath = path;
@@ -210,15 +215,60 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
                 .show();
     }
 
+    private boolean canAskAllFiles() {
+        if (android.os.Build.VERSION.SDK_INT < 30 || BuildInfo.PLAY_BUILD) return false;
+        try {
+            String[] req = getPackageManager().getPackageInfo(getPackageName(), android.content.pm.PackageManager.GET_PERMISSIONS).requestedPermissions;
+            if (req != null) for (String r : req) if ("android.permission.MANAGE_EXTERNAL_STORAGE".equals(r)) return true;
+        } catch (Exception ignored) {}
+        return false;
+    }
+
+    private void requestAllFiles(String path, int tabId) {
+        if (pickerOpen) return;
+        pickerOpen = true;
+        new android.app.AlertDialog.Builder(this)
+                .setTitle("Allow storage access")
+                .setMessage("Mímir needs access to your device storage to open:\n\n" + path
+                        + "\n\nLike Termux's storage setup, Android opens a settings page: turn on “Allow access to manage all files”, then come back.\n\nThis is asked once.")
+                .setPositiveButton("Allow", (d, w) -> {
+                    pickerOpen = false;
+                    pendingAllFilesPath = path; pendingAllFilesTab = tabId;
+                    try {
+                        startActivity(new Intent(android.provider.Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION, Uri.parse("package:" + getPackageName())));
+                    } catch (Exception e) {
+                        startActivity(new Intent(android.provider.Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION));
+                    }
+                })
+                .setNegativeButton("Deny", (d, w) -> { pickerOpen = false; status("Storage access not granted"); })
+                .setOnCancelListener(d -> pickerOpen = false)
+                .show();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (!awaitingPicker) pickerOpen = false;     // never leave prompts blocked after an interrupted flow
+        if (pendingAllFilesPath != null) {
+            String p = pendingAllFilesPath; int tab = pendingAllFilesTab;
+            pendingAllFilesPath = null; pendingAllFilesTab = -1;
+            if (FolderAccess.allFilesAccess()) {
+                WebView w = tabs.get(tab);
+                if (w != null) w.reload();
+                status("Storage access granted — Mímir can open files on this device");
+            } else status("Storage access not granted for " + p);
+        }
+    }
+
     private void launchPicker(Uri initial) {
         Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
         i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
         if (initial != null) i.putExtra(android.provider.DocumentsContract.EXTRA_INITIAL_URI, initial);
         try {
-            pickerOpen = true;
+            pickerOpen = true; awaitingPicker = true;
             startActivityForResult(i, REQ_TREE);
         } catch (Exception e) {
-            pickerOpen = false;
+            pickerOpen = false; awaitingPicker = false;
             status("No folder picker available: " + e.getMessage());
         }
     }
@@ -227,7 +277,7 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode != REQ_TREE) return;
-        pickerOpen = false;
+        pickerOpen = false; awaitingPicker = false;
         String pending = pendingGrantPath; int tab = pendingGrantTab;
         pendingGrantPath = null; pendingGrantTab = -1;
         if (resultCode != RESULT_OK || data == null || data.getData() == null) { status("Folder access not granted"); return; }

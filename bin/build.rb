@@ -322,7 +322,7 @@ def bundle
   mrb; native; opal
   abort "missing #{BUNDLETOOL}" unless File.exist?(BUNDLETOOL)
   pass, alias_ = release_creds
-  manifest = File.join(ANDROID, 'AndroidManifest.xml')
+  manifest = ruby_manifest
   res_zip  = File.join(BUILD, 'res.zip')
   proto    = File.join(BUILD, 'proto.apk')
   mod_dir  = File.join(BUILD, 'aab', 'base')
@@ -363,9 +363,30 @@ end
 
 # Gradle path (needed for AAR dependencies such as Play Billing): Ruby builds mruby, the native
 # library, bytecode and Opal UI, then Gradle compiles Java + resources and packages the APK/AAB.
+def play_build?
+  cmd = ARGV.reject { |a| a.start_with?('--') }[0]
+  ARGV.include?('--play') || %w[bundle gbundle].include?(cmd)
+end
+
+# Google Play rejects MANAGE_EXTERNAL_STORAGE for browsers: Play artifacts never declare it.
+def strip_play_permissions(m)
+  play_build? ? m.gsub(/\s*<uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" \/>/, '') : m
+end
+
+# Manifest used by the Ruby pipeline: Play builds get a copy without MANAGE_EXTERNAL_STORAGE.
+def ruby_manifest
+  src = File.join(ANDROID, 'AndroidManifest.xml')
+  return src unless play_build?
+  out = File.join(BUILD, 'AndroidManifest.play.xml')
+  FileUtils.mkdir_p(BUILD)
+  File.write(out, strip_play_permissions(File.read(src)))
+  out
+end
+
 def gradle_manifest
   m = File.read(File.join(ANDROID, 'AndroidManifest.xml'))
   m = m.sub(/\s*package="[^"]*"/, '')      # AGP takes the namespace from build.gradle
+  m = strip_play_permissions(m)
   FileUtils.mkdir_p(File.join(BUILD, 'gradle'))
   File.write(File.join(BUILD, 'gradle', 'AndroidManifest.xml'), m)
 end
@@ -394,7 +415,7 @@ def build
   check_tools
   FileUtils.mkdir_p(BUILD)
   res_files = Dir[File.join(ANDROID, 'res', '**', '*')].select { |f| File.file?(f) }
-  manifest  = File.join(ANDROID, 'AndroidManifest.xml')
+  manifest  = ruby_manifest
   java_src  = Dir[File.join(ANDROID, 'src', '**', '*.java')]
   gen_dir   = File.join(BUILD, 'gen')
   cls_dir   = File.join(BUILD, 'classes')

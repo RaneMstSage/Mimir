@@ -55,6 +55,7 @@ final class FolderAccess {
     /** Canonical form: /sdcard and /storage/self/primary become /storage/emulated/0; no trailing slash. */
     static String normalize(String p) {
         if (p == null || p.isEmpty()) return "/";
+        if (p.startsWith("/data/user/0/")) p = "/data/data/" + p.substring("/data/user/0/".length());
         if (p.startsWith("/sdcard")) p = EXT_ROOT + p.substring("/sdcard".length());
         else if (p.startsWith("/storage/self/primary")) p = EXT_ROOT + p.substring("/storage/self/primary".length());
         while (p.length() > 1 && p.endsWith("/")) p = p.substring(0, p.length() - 1);
@@ -167,11 +168,19 @@ final class FolderAccess {
         Result(WebResourceResponse r, String needs) { response = r; needsGrantFor = needs; }
     }
 
+    /** True when Mímir holds "All files access" (shared storage readable by path). */
+    static boolean allFilesAccess() {
+        return android.os.Build.VERSION.SDK_INT >= 30 && android.os.Environment.isExternalStorageManager();
+    }
+
+    static boolean isSharedStorage(String path) { return path.equals(EXT_ROOT) || path.startsWith(EXT_ROOT + "/"); }
+
     /** Serve a https://local.mimir/... request. needsGrantFor is set when no grant covers the path. */
     Result serve(Uri url) {
         String raw = url.getPath() == null ? "/" : url.getPath();
         boolean slash = raw.endsWith("/");
         String path = normalize(raw);
+        if (isSharedStorage(path) && allFilesAccess()) return serveFile(url, path, slash);
         Grant g = covering(path);
         if (g == null) return new Result(page(403, "Mímir needs access to this folder",
                 "<p>A folder picker has opened. Choose <b>Use this folder</b> to let Mímir open files there.</p>"
@@ -193,6 +202,27 @@ final class FolderAccess {
             return new Result(stream(in, mimeFor(path)), null);
         } catch (SecurityException e) {
             return new Result(page(403, "Access was revoked", "<p>Reopen the file to grant access again.</p>"), path);
+        } catch (Exception e) {
+            return new Result(page(404, "Not found", "<p class=m>" + esc(path) + "</p><p class=m>" + esc(String.valueOf(e)) + "</p>"), null);
+        }
+    }
+
+    /** Direct filesystem read (All files access). */
+    private Result serveFile(Uri url, String path, boolean slash) {
+        java.io.File f = new java.io.File(path);
+        try {
+            if (!f.exists()) return new Result(page(404, "Not found", "<p class=m>" + esc(path) + "</p>"), null);
+            if (f.isDirectory()) {
+                if (!slash) return new Result(redirect(url.getEncodedPath() + "/"), null);
+                java.io.File index = new java.io.File(f, "index.html");
+                if (index.isFile()) return new Result(stream(new java.io.FileInputStream(index), "text/html"), null);
+                java.io.File[] kids = f.listFiles();
+                List<String[]> rows = new ArrayList<>();
+                if (kids != null) for (java.io.File k : kids) rows.add(new String[]{k.getName(),
+                        k.isDirectory() ? DocumentsContract.Document.MIME_TYPE_DIR : mimeFor(k.getName()), k.isDirectory() ? "" : String.valueOf(k.length())});
+                return new Result(listingHtml(path, path.equals(EXT_ROOT), rows), null);
+            }
+            return new Result(stream(new java.io.FileInputStream(f), mimeFor(path)), null);
         } catch (Exception e) {
             return new Result(page(404, "Not found", "<p class=m>" + esc(path) + "</p><p class=m>" + esc(String.valueOf(e)) + "</p>"), null);
         }
@@ -275,13 +305,17 @@ final class FolderAccess {
                 rows.add(new String[]{c.getString(0), c.getString(1), c.isNull(2) ? "" : String.valueOf(c.getLong(2))});
             }
         } catch (Exception ignored) {}
+        return listingHtml(path, path.equals(g.rootPath), rows);
+    }
+
+    private static WebResourceResponse listingHtml(String path, boolean atRoot, List<String[]> rows) {
         Collections.sort(rows, (a, b) -> {
             boolean da = DocumentsContract.Document.MIME_TYPE_DIR.equals(a[1]), db = DocumentsContract.Document.MIME_TYPE_DIR.equals(b[1]);
             if (da != db) return da ? -1 : 1;
             return a[0].compareToIgnoreCase(b[0]);
         });
         StringBuilder sb = new StringBuilder("<!doctype html><title>" + esc(path) + "</title>" + STYLE + "<h1>📁 " + esc(path) + "</h1><ul>");
-        if (!path.equals(g.rootPath)) sb.append("<li><a href='../'>⬆ Parent folder</a></li>");
+        if (!atRoot) sb.append("<li><a href='../'>⬆ Parent folder</a></li>");
         for (String[] r : rows) {
             boolean dir = DocumentsContract.Document.MIME_TYPE_DIR.equals(r[1]);
             String href = Uri.encode(r[0]) + (dir ? "/" : "");
