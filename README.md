@@ -24,6 +24,20 @@ Named for the Norse sage whose counsel reveals hidden knowledge.
 - **Scripts & styles**: per-site user JavaScript and CSS with URL patterns, run at page start or end,
   import `.user.js` files, and block unwanted requests. The extension substitute.
 
+## Open local files
+
+From Termux, open a project the way you would with `chrome index.html` on a desktop:
+
+    mimir index.html              # a file, relative to where you are
+    mimir ~/Projects/site         # a folder: its index.html, or a file listing
+    mimir .                       # the current folder
+
+Mímir serves the folder itself at `https://local.mimir/<path>`, so relative links, ES modules and
+`fetch()` work like a real site, and reloading shows your latest edits. The first time, Android asks
+once for folder access: choose **Use this folder** (granting your Termux home covers every project).
+Without Termux, use ⋮ → **Open folder…**; manage granted folders in Settings → Privacy & data.
+`bin/mimir` is the launcher; link it with `ln -s "$PWD/bin/mimir" "$PREFIX/bin/mimir"`.
+
 ## How it is built
 
 Everything is developed *on the tablet* in Termux. There is no Gradle and no Android Studio.

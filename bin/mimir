@@ -1,0 +1,32 @@
+#!/data/data/com.termux/files/usr/bin/bash
+# mimir — open a file, folder or URL in Mímir, like `chrome <file>` on a desktop.
+#
+#   mimir index.html            open a file (relative to where you are)
+#   mimir ~/Projects/site       open a folder (its index.html, or a listing)
+#   mimir .                     open the current folder
+#   mimir https://example.com   open a URL
+#
+# Mímir serves the folder itself at https://local.mimir/<path>, so relative links, ES modules
+# and fetch() work like a real site. The first time, Android asks once for folder access;
+# granting your Termux home covers every project. No servers, no ports.
+set -u
+PKG="com.mstsage.mimir"
+
+case "${1:-}" in
+  ""|-h|--help) sed -n '2,11p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+esac
+
+launch() {   # launch <description> <am args...>
+  local what="$1"; shift
+  if timeout 15 am start -a android.intent.action.VIEW -n "$PKG/.MainActivity" "$@" >/dev/null 2>&1; then
+    echo "Opened in Mímir: $what"
+  else
+    echo "Could not launch Mímir (is it installed?)" >&2; exit 1
+  fi
+}
+
+arg="$1"
+if [[ "$arg" =~ ^[a-zA-Z][a-zA-Z0-9+.-]*: ]]; then launch "$arg" -d "$arg"; exit 0; fi
+[ -e "$arg" ] || { echo "No such file or folder: $arg" >&2; exit 1; }
+path="$(realpath "$arg")"
+launch "$path" --es path "$path"

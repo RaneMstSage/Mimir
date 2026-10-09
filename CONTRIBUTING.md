@@ -54,6 +54,14 @@ open it from your file manager.
   compiled chrome: boot, receive state, open every page, click through. A failing UI test fails the build.
 - Add a test when you add logic. Layout bugs still need a device.
 
+## Local files
+
+`FolderAccess.java` serves `https://local.mimir/<absolute path>` from Storage Access Framework tree
+grants, intercepted in `PageClient.shouldInterceptRequest`. Supported providers map documents to real
+paths: Termux (`com.termux.documents`, document id = absolute path) and shared storage
+(`com.android.externalstorage.documents`, `primary:X` = `/storage/emulated/0/X`). An uncovered
+main-frame request triggers the folder picker once. `bin/mimir` passes the path as an intent extra.
+
 ## Things that will bite you
 
 - **Opal returns a method's last expression.** A backtick block with two JavaScript statements as the

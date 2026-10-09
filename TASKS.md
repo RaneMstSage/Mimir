@@ -65,3 +65,11 @@ Design target: what a modern desktop browser does, in a compact dark theme.
 - [ ] Offline DevTools frontend (bundle the frontend or WebViewAssetLoader cache)
 
 - [x] PC build path verified (Arch Linux, NDK 30, Studio JBR 25): mruby cross build, NDK-linked libmimir.so passes the gate, 21 tests, Opal, Gradle APK. Issue #1 closed.
+
+## 0.8.7 — Open local files and folders
+- [x] FolderAccess: SAF tree grants → https://local.mimir/<path> (Termux + shared storage), index.html, listing, 404/403
+- [x] Interceptor + one-time grant flow (picker opens at Termux home), file:// / path intents, manifest filter
+- [x] Ruby: omnibox paths → local origin, folder.open / folder.release / folders.changed, tests
+- [x] UI: ⋮ → Open folder…, Settings → Folders Mímir can open (Remove), jsdom checks
+- [x] bin/mimir thin launcher (path extra, no servers), README + CONTRIBUTING
+- [ ] Device verification with ~/Projects/demo (styled page, ES module, fetch, reload, DevTools, listing, revoke)
