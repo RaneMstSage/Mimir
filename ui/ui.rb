@@ -266,6 +266,7 @@ module UI
     dt = @state["devtools"] || {}
     rows = [
       ["tab.new", "New tab", "+"],
+      ["folder.open", "Open folder…", "📁"],
       ["bookmark.toggle", "Bookmark this page", "☆"],
       ["page:bookmarks", "Bookmarks", "›"],
       ["page:history", "History", "›"],
@@ -439,8 +440,9 @@ module UI
     when "bookmark.move"
       send("bookmark.update", "id" => `String(#{target}.dataset.id || "")`, "parent" => `String(#{target}.value || "")`)
     when "bookmarks.bar"   then send("bookmarks.bar")
-    when "ua.toggle", "devtools.toggle", "dock.toggle", "dev.toggle", "devtools.chrome", "settings.open", "about", "donate" then send(act)
+    when "ua.toggle", "devtools.toggle", "dock.toggle", "dev.toggle", "devtools.chrome", "settings.open", "about", "donate", "folder.open" then send(act)
     when "billing.buy" then send("billing.buy", "product" => `String(#{target}.dataset.id || "")`)
+    when "folder.release" then send("folder.release", "path" => `String(#{target}.dataset.path || "")`)
     when "billing.retry" then send("support.open")
     end
     render_menu
@@ -523,6 +525,7 @@ module UI
       "<h2>Content</h2><div class=\"card\">" +
         toggle("javascript", "JavaScript", "Turning this off breaks most sites; useful for testing") +
         toggle("cookies_3p", "Allow third-party cookies") +
+      "</div><h2>Folders Mímir can open</h2><div class=\"card\">" + folders_rows +
       "</div><h2>Clear browsing data</h2><div class=\"card\">" +
         %w[history cookies cache storage].map { |w| "<label class=\"row\"><div class=\"l\"><b>#{w.capitalize}</b></div><input type=\"checkbox\" data-clear=\"#{w}\" #{w == 'history' || w == 'cache' ? 'checked' : ''}></label>" }.join +
         "<div class=\"row\"><div class=\"l\"></div><button class=\"btn danger\" data-act=\"clear.data\">Clear selected</button></div>" +
@@ -536,6 +539,17 @@ module UI
         "<div class=\"row\"><div class=\"l\"><b>Engine</b><small>Android System WebView (Chromium). No Chrome extensions; use Scripts instead.</small></div></div>" +
       "</div>"
     end
+  end
+
+  def self.folders_rows
+    list = @state["folders"] || []
+    if list.empty?
+      return "<div class=\"row\"><div class=\"l\"><b>None yet</b><small>Use ⋮ → Open folder…, or run <code>mimir path/to/index.html</code> in Termux</small></div></div>"
+    end
+    list.map do |f|
+      "<div class=\"row\"><div class=\"l\"><b>#{esc(f["label"])}</b><small>#{esc(f["path"])}</small></div>" \
+      "<button class=\"btn\" data-act=\"folder.release\" data-path=\"#{esc(f["path"])}\">Remove</button></div>"
+    end.join
   end
 
   def self.matches?(e)
