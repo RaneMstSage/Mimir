@@ -480,7 +480,17 @@ when 'build'   then build
 when 'release' then release
 when 'gradle'  then gradle(ARGV[1] || ':app:assembleDebug')
 when 'gbuild'   then gradle(':app:assembleDebug')
-when 'ginstall' then out = gradle(':app:assembleDebug'); FileUtils.cp(out, File.join(Dir.home, 'storage', 'downloads', 'Mimir.apk')); system('am', 'start', '-a', 'android.intent.action.VIEW_DOWNLOADS', out: File::NULL, err: File::NULL); puts 'APK copied to Downloads/Mimir.apk — tap it in the file manager to install.'
+when 'ginstall'
+  out = gradle(':app:assembleDebug')
+  # Versioned name: overwriting one file leaves stale dates/sizes in Android's media index.
+  ver = (JSON.parse(File.read(File.join(ROOT, 'mimir.config.json')))['version'] rescue 'dev')
+  dl = File.join(Dir.home, 'storage', 'downloads')
+  Dir[File.join(dl, 'Mimir-*-debug.apk')].each { |f| FileUtils.rm_f(f) }
+  dest = File.join(dl, "Mimir-#{ver}-debug.apk")
+  FileUtils.cp(out, dest)
+  system('termux-media-scan', dest, out: File::NULL, err: File::NULL) if system('command -v termux-media-scan >/dev/null 2>&1')
+  system('am', 'start', '-a', 'android.intent.action.VIEW_DOWNLOADS', out: File::NULL, err: File::NULL)
+  puts "APK copied to Downloads/#{File.basename(dest)} — tap it in the file manager to install."
 when 'grelease' then gradle(':app:assembleRelease')
 when 'gbundle'  then gradle(':app:bundleRelease')
 when 'bundle'  then build; bundle
