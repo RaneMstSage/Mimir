@@ -54,6 +54,12 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
     private static final String DEVTOOLS_CDN = "https://chrome-devtools-frontend.appspot.com";
 
     private final Handler main = new Handler(Looper.getMainLooper());
+    // Local files/folders (https://local.mimir/<path>) through one-time folder grants.
+    private FolderAccess folders;
+    private static final int REQ_TREE = 4711;
+    private String pendingGrantPath = null;
+    private int pendingGrantTab = -1;
+    private boolean pickerOpen = false;
     private final RubyRuntime ruby = RubyRuntime.get();
     private final Map<Integer, WebView> tabs = new HashMap<>();
     private int currentTab = -1;
@@ -148,10 +154,12 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
             getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
                     android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT, this::handleBack);
         }
+        folders = new FolderAccess(this);
         final String startUrl = urlFromIntent(getIntent());
         main.post(() -> {
             ruby.start(this);
             ruby.event("ui.ready", "tabs", new JSONArray(new ArrayList<>(tabs.keySet())), "url", startUrl);
+            ruby.event("folders.changed", "folders", folders.toJson());
         });
     }
 
@@ -164,12 +172,67 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
 
     private String urlFromIntent(Intent i) {
         if (i == null) return null;
+        // `mimir <path>` from Termux passes the absolute path as an extra; file managers send file://.
+        String path = i.getStringExtra("path");
+        if (path == null && i.getData() != null && "file".equals(i.getData().getScheme())) path = i.getData().getPath();
+        if (path != null && !path.isEmpty()) return FolderAccess.urlFor(path);
         if (Intent.ACTION_VIEW.equals(i.getAction()) && i.getData() != null) return i.getData().toString();
         if (Intent.ACTION_SEND.equals(i.getAction())) {
             String t = i.getStringExtra(Intent.EXTRA_TEXT);
             if (t != null) for (String w : t.split("\\s+")) if (w.startsWith("http")) return w;
         }
         return null;
+    }
+
+    // ---- local folders: one-time grant through Android's folder picker ----
+    private void requestGrant(String path, int tabId) {
+        if (pickerOpen) return;
+        pendingGrantPath = path;
+        pendingGrantTab = tabId;
+        status("Choose “Use this folder” so Mímir can open files there (one time)");
+        launchPicker(FolderAccess.initialUriFor(path));
+    }
+
+    private void launchPicker(Uri initial) {
+        Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
+        i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
+        if (initial != null) i.putExtra(android.provider.DocumentsContract.EXTRA_INITIAL_URI, initial);
+        try {
+            pickerOpen = true;
+            startActivityForResult(i, REQ_TREE);
+        } catch (Exception e) {
+            pickerOpen = false;
+            status("No folder picker available: " + e.getMessage());
+        }
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode != REQ_TREE) return;
+        pickerOpen = false;
+        String pending = pendingGrantPath; int tab = pendingGrantTab;
+        pendingGrantPath = null; pendingGrantTab = -1;
+        if (resultCode != RESULT_OK || data == null || data.getData() == null) { status("Folder access not granted"); return; }
+        Uri tree = data.getData();
+        try {
+            getContentResolver().takePersistableUriPermission(tree, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        } catch (Exception e) { status("Could not keep folder access: " + e.getMessage()); return; }
+        folders.refresh();
+        ruby.event("folders.changed", "folders", folders.toJson());
+        String root = FolderAccess.docIdToPath(tree.getAuthority(), android.provider.DocumentsContract.getTreeDocumentId(tree));
+        if (root == null) { status("That location isn't a local folder Mímir can open yet"); return; }
+        if (pending != null) {
+            if (folders.covering(FolderAccess.normalize(pending)) != null) {
+                WebView w = tabs.get(tab);
+                if (w != null) w.reload();
+                status("Mímir can now open files in " + root);
+            } else {
+                status("That folder doesn't contain " + pending + " — open it again and pick a folder above it");
+            }
+        } else {
+            ruby.event("intent.url", "url", FolderAccess.urlFor(root) + "/");
+        }
     }
 
     private long lastNavMs = 0;
@@ -281,6 +344,12 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
                     break;
                 }
                 case "dev.toggle": toggleRubyPane(); break;
+                case "folder.pick": pendingGrantPath = null; pendingGrantTab = -1; launchPicker(null); break;
+                case "folder.release":
+                    folders.release(cmd.optString("path"));
+                    ruby.event("folders.changed", "folders", folders.toJson());
+                    toast("Folder access removed");
+                    break;
                 case "devtools.dock": openDevtools(cmd.optString("side", "right"), (float) cmd.optDouble("fraction", 0.45)); break;
                 case "devtools.inspect": enterInspectMode((float) cmd.optDouble("x", 0), (float) cmd.optDouble("y", 0), cmd.optBoolean("fresh", false)); break;
                 case "devtools.open": {
@@ -614,6 +683,14 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
             return true;
         }
         @Override public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest req) {
+            if (FolderAccess.HOST.equals(req.getUrl().getHost())) {
+                FolderAccess.Result r = folders.serve(req.getUrl());
+                if (r.needsGrantFor != null && req.isForMainFrame()) {
+                    final String need = r.needsGrantFor;
+                    main.post(() -> requestGrant(need, id));
+                }
+                return r.response;
+            }
             if (blockRules.length > 0 && !req.isForMainFrame() && blocked(req.getUrl().toString())) {
                 return new WebResourceResponse("text/plain", "utf-8", 204, "Blocked by Mimir", new HashMap<>(), new java.io.ByteArrayInputStream(new byte[0]));
             }

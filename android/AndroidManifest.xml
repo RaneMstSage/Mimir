@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.mstsage.mimir"
-    android:versionCode="806"
-    android:versionName="0.8.6">
+    android:versionCode="807"
+    android:versionName="0.8.7">
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
@@ -41,6 +41,13 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="http" />
                 <data android:scheme="https" />
+            </intent-filter>
+            <!-- Local files handed over by file managers (Termux uses an explicit `path` extra) -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="file" />
+                <data android:mimeType="text/html" />
             </intent-filter>
             <intent-filter>
                 <action android:name="android.intent.action.SEND" />
