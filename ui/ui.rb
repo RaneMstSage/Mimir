@@ -78,8 +78,23 @@ module UI
   def self.esc(s)
     s.to_s.gsub("&", "&amp;").gsub("<", "&lt;").gsub(">", "&gt;").gsub('"', "&quot;")
   end
+  # Local files are served at https://local.mimir/<path> (so modules and fetch work); show them as file://.
+  def self.local?(url) ; u = url.to_s ; u == "https://local.mimir" || u.start_with?("https://local.mimir/") ; end
+
+  def self.display_url(url)
+    return url.to_s unless local?(url)
+    path = url.to_s.sub("https://local.mimir", "")
+    path = "/" if path.empty?
+    decoded = `(function(p){try{return decodeURIComponent(p)}catch(e){return p}})(#{path})`
+    "file://" + decoded
+  end
+
   def self.host_of(url)
     u = url.to_s
+    if local?(u)
+      segs = display_url(u).sub("file://", "").split("/").reject(&:empty?)
+      return segs.empty? ? "/" : segs.last
+    end
     i = u.index("://") ; return u[0, 30] unless i
     rest = u[(i + 3)..-1] ; j = rest.index("/")
     (j ? rest[0, j] : rest).sub("www.", "")
@@ -169,12 +184,12 @@ module UI
     desktop = @state["desktop"]
     dt = @state["devtools"] || {}
     secure = url.start_with?("https://")
-    lock = url.empty? ? "" : (secure ? "🔒" : "ⓘ")
+    lock = url.empty? ? "" : (local?(url) ? "📄" : (secure ? "🔒" : "ⓘ"))
     html = "<button class=\"ib#{@state["can_back"] ? '' : ' dis'}\" data-act=\"nav.back\">‹</button>" \
            "<button class=\"ib#{@state["can_forward"] ? '' : ' dis'}\" data-act=\"nav.forward\">›</button>" \
            "<button class=\"ib\" data-act=\"#{@state["loading"] ? 'nav.stop' : 'nav.reload'}\">#{@state["loading"] ? '✕' : '↻'}</button>" \
            "<div id=\"omni\"><span class=\"lock\">#{lock}</span>" \
-             "<input id=\"url\" type=\"text\" inputmode=\"url\" autocomplete=\"off\" autocorrect=\"off\" autocapitalize=\"off\" spellcheck=\"false\" placeholder=\"Search or enter address\" value=\"#{esc(url)}\">" \
+             "<input id=\"url\" type=\"text\" inputmode=\"url\" autocomplete=\"off\" autocorrect=\"off\" autocapitalize=\"off\" spellcheck=\"false\" placeholder=\"Search or enter address\" value=\"#{esc(display_url(url))}\">" \
              "<button class=\"star#{starred ? ' on' : ''}\" data-act=\"bookmark.toggle\" aria-label=\"Bookmark\">#{starred ? '★' : '☆'}</button>" \
              "<div id=\"prog\" style=\"width:#{@state["loading"] ? @state["progress"].to_i : 0}%\"></div>" \
            "</div>" \
@@ -267,6 +282,7 @@ module UI
     rows = [
       ["tab.new", "New tab", "+"],
       ["file.open", "Open file…", "📄"],
+      ["folder.open", "Open folder…", "📁"],
       ["bookmark.toggle", "Bookmark this page", "☆"],
       ["page:bookmarks", "Bookmarks", "›"],
       ["page:history", "History", "›"],
@@ -297,7 +313,7 @@ module UI
     pool = (flat.map { |b| b.merge("k" => "★") } + (@state["history"] || []).map { |h| h.merge("k" => "⌚") })
     hits = pool.select { |e| e["url"].to_s.downcase.include?(q) || e["title"].to_s.downcase.include?(q) }.first(6)
     @sel = -1
-    html = hits.map { |e| "<button class=\"s\" data-act=\"open\" data-url=\"#{esc(e["url"])}\"><span class=\"k\">#{e["k"]}</span><span>#{esc(e["title"].to_s[0, 40])}</span><span class=\"u\">#{esc(e["url"])}</span></button>" }.join
+    html = hits.map { |e| "<button class=\"s\" data-act=\"open\" data-url=\"#{esc(e["url"])}\"><span class=\"k\">#{e["k"]}</span><span>#{esc(e["title"].to_s[0, 40])}</span><span class=\"u\">#{esc(display_url(e["url"]))}</span></button>" }.join
     html += "<button class=\"s\" data-act=\"navigate\" data-text=\"#{esc(q)}\"><span class=\"k\">🔍</span><span>Search for “#{esc(q)}”</span></button>"
     show(box, html)
     sync_height
@@ -565,7 +581,7 @@ module UI
     out = "<div class=\"row\" style=\"padding:0 0 8px\"><div class=\"l\"></div><button class=\"btn\" data-act=\"history.clear\">Clear all history</button></div>"
     days.each do |d, list|
       out += "<div class=\"day\">#{d}</div><div class=\"card\">" + list.map { |h|
-        "<div class=\"row link\" data-act=\"open.page\" data-url=\"#{esc(h["url"])}\"><img src=\"#{esc(favicon(h))}\" alt=\"\"><div class=\"l\"><b>#{esc(h["title"])}</b><small>#{esc(h["url"])}</small></div>" \
+        "<div class=\"row link\" data-act=\"open.page\" data-url=\"#{esc(h["url"])}\"><img src=\"#{esc(favicon(h))}\" alt=\"\"><div class=\"l\"><b>#{esc(h["title"])}</b><small>#{esc(display_url(h["url"]))}</small></div>" \
         "<button class=\"del\" data-act=\"history.remove\" data-url=\"#{esc(h["url"])}\" aria-label=\"Remove\">✕</button></div>"
       }.join + "</div>"
     end

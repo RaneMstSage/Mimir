@@ -56,6 +56,12 @@ try {
   click(doc.querySelector('[data-act="menu.toggle"]'));
   const of = doc.querySelector('[data-act="file.open"]'); if (!of) throw new Error('no Open file menu item'); click(of);
   console.log('open file sent:', sent.some(e => e.ev === 'file.open'));
+  click(doc.querySelector('[data-act="menu.toggle"]'));
+  const ofd = doc.querySelector('[data-act="folder.open"]'); if (!ofd) throw new Error('no Open folder menu item'); click(ofd);
+  console.log('open folder sent:', sent.some(e => e.ev === 'folder.open'));
+  window.UI.receive(JSON.stringify(Object.assign({}, st, {url: 'https://local.mimir/data/data/com.termux/files/home/My%20Site/index.html'})));
+  const shown = doc.getElementById('url').value;
+  console.log('file:// display:', shown === 'file:///data/data/com.termux/files/home/My Site/index.html', '|', shown, '| icon:', doc.querySelector('#omni .lock').textContent);
   click(doc.querySelector('[data-act="menu.toggle"]')); click(doc.querySelector('[data-act="page:settings"]')); click(doc.querySelector('[data-act="section:privacy"]'));
   console.log('folder list:', doc.getElementById('page').innerHTML.includes('Termux home'));
   click(doc.querySelector('[data-act="folder.release"]'));
