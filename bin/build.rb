@@ -421,7 +421,7 @@ def embed_symbols(aab)
   FileUtils.mkdir_p(dir)
   FileUtils.cp(SO_UNSTRIPPED, File.join(dir, 'libmimir.so.dbg'))
   system('zip', '-q', '-d', aab, 'META-INF/*', out: File::NULL, err: File::NULL)   # drop the old signature
-  Dir.chdir(work) { sh('zip', '-q', '-r', aab, 'BUNDLE-METADATA', quiet: true) }
+  Dir.chdir(work) { sh('zip', '-q', '-r', '-D', aab, 'BUNDLE-METADATA', quiet: true) }   # -D: bundles reject directory entries
   sh('jarsigner', '-keystore', RELEASE_KS, '-storepass', pass, '-keypass', pass, '-sigalg', 'SHA256withRSA',
      '-digestalg', 'SHA-256', aab, alias_, quiet: true)
   sh('java', '-jar', BUNDLETOOL, 'validate', "--bundle=#{aab}", quiet: true)
@@ -533,7 +533,7 @@ when 'ginstall'
   system('am', 'start', '-a', 'android.intent.action.VIEW_DOWNLOADS', out: File::NULL, err: File::NULL)
   puts "APK copied to Downloads/#{File.basename(dest)} — tap it in the file manager to install."
 when 'grelease' then gradle(':app:assembleRelease')
-when 'gbundle'  then embed_symbols(gradle(':app:bundleRelease'))
+when 'gbundle'  then gradle(':app:bundleRelease')
 when 'embed'    then embed_symbols(File.expand_path(ARGV[1].to_s))
 when 'bundle'  then build; bundle
 when 'install' then build; install
