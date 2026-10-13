@@ -2,7 +2,7 @@
 
 All notable changes to Mímir. Versions match the Play Store and GitHub releases.
 
-## 0.8.7 — unreleased
+## 0.8.7 — 2026-10-13
 
 ### Added
 - **Open local files and folders.** From Termux, `mimir index.html`, `mimir ~/Projects/site` or

@@ -1,6 +1,6 @@
 # Mímir Privacy Policy
 
-*Effective: September 10, 2026*
+*Effective: October 13, 2026*
 
 Mímir is a developer-tools web browser for Android published by MstSage Entertainment, LLC.
 This policy explains what the app does with data. The short version: **Mímir does not collect,
@@ -14,6 +14,10 @@ Mímir keeps the following on your device, in the app's private storage, and now
 - Settings (search engine, home page, appearance, DevTools preferences)
 - User scripts and styles you create or import, and request-blocking rules
 - Cookies, site data and cache belonging to the websites you visit, managed by Android System WebView
+
+- Local files and folders you choose to open (via ⋮ → Open file / Open folder, the `mimir` command,
+  or a typed path). Mímir reads them on your device to display them; they are never uploaded. Folder
+  access you grant is listed in Settings → Privacy & data, where you can remove it.
 
 You can delete history, cookies, cache and site storage from **Settings → Privacy & data**, and
 everything is removed when you uninstall the app. None of this data is transmitted to us.
@@ -45,6 +49,8 @@ Mímir contains no analytics, no advertising, and no tracking SDKs.
 ## Permissions
 
 - `INTERNET` and `ACCESS_NETWORK_STATE`: required to load web pages.
+- `MANAGE_EXTERNAL_STORAGE` (GitHub build only, optional): lets you open web projects stored in your
+  device storage by path. Requested only when you open such a file; never used to scan or upload files.
 - `com.android.vending.BILLING` (Play version): required for optional tips through Google Play.
 
 ## Children
