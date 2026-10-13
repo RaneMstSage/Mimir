@@ -410,6 +410,25 @@ def gradle(task)
   out
 end
 
+# Put the native debug symbols inside the .aab (BUNDLE-METADATA, where Play reads them), so the
+# bundle is the only thing to upload. The bundle is then re-signed with the release key.
+def embed_symbols(aab)
+  return aab unless aab && File.exist?(aab) && File.exist?(SO_UNSTRIPPED)
+  pass, alias_ = release_creds
+  work = File.join(BUILD, 'symbols-meta')
+  FileUtils.rm_rf(work)
+  dir = File.join(work, 'BUNDLE-METADATA', 'com.android.tools.build.debugsymbols', 'arm64-v8a')
+  FileUtils.mkdir_p(dir)
+  FileUtils.cp(SO_UNSTRIPPED, File.join(dir, 'libmimir.so.dbg'))
+  system('zip', '-q', '-d', aab, 'META-INF/*', out: File::NULL, err: File::NULL)   # drop the old signature
+  Dir.chdir(work) { sh('zip', '-q', '-r', aab, 'BUNDLE-METADATA', quiet: true) }
+  sh('jarsigner', '-keystore', RELEASE_KS, '-storepass', pass, '-keypass', pass, '-sigalg', 'SHA256withRSA',
+     '-digestalg', 'SHA-256', aab, alias_, quiet: true)
+  sh('java', '-jar', BUNDLETOOL, 'validate', "--bundle=#{aab}", quiet: true)
+  puts "✓ native debug symbols embedded in #{File.basename(aab)}"
+  aab
+end
+
 def build
   gen_buildinfo
   check_tools
@@ -514,7 +533,8 @@ when 'ginstall'
   system('am', 'start', '-a', 'android.intent.action.VIEW_DOWNLOADS', out: File::NULL, err: File::NULL)
   puts "APK copied to Downloads/#{File.basename(dest)} — tap it in the file manager to install."
 when 'grelease' then gradle(':app:assembleRelease')
-when 'gbundle'  then gradle(':app:bundleRelease')
+when 'gbundle'  then embed_symbols(gradle(':app:bundleRelease'))
+when 'embed'    then embed_symbols(File.expand_path(ARGV[1].to_s))
 when 'bundle'  then build; bundle
 when 'install' then build; install
 when 'run'     then run
