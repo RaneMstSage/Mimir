@@ -57,6 +57,7 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
     // Local files/folders (https://local.mimir/<path>) through one-time folder grants.
     private FolderAccess folders;
     private static final int REQ_TREE = 4711;
+    private static final int REQ_FILE = 4712;
     private String pendingGrantPath = null;
     private int pendingGrantTab = -1;
     private boolean pickerOpen = false;
@@ -276,6 +277,7 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == REQ_FILE) { onFilePicked(resultCode, data); return; }
         if (requestCode != REQ_TREE) return;
         pickerOpen = false; awaitingPicker = false;
         String pending = pendingGrantPath; int tab = pendingGrantTab;
@@ -300,6 +302,24 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
         } else {
             ruby.event("intent.url", "url", FolderAccess.urlFor(root) + "/");
         }
+    }
+
+    /** Open file…: map the picked document to its real path and open it on the local origin, so the
+     *  rest of its folder (CSS, JS, images) loads too. Access prompts follow if needed. */
+    private void onFilePicked(int resultCode, Intent data) {
+        if (resultCode != RESULT_OK || data == null || data.getData() == null) return;
+        Uri doc = data.getData();
+        String path = null;
+        try {
+            String id = android.provider.DocumentsContract.getDocumentId(doc);
+            if (id.startsWith("raw:")) path = FolderAccess.normalize(id.substring(4));          // Downloads provider
+            else path = FolderAccess.docIdToPath(doc.getAuthority(), id);                      // Termux, device storage
+        } catch (Exception ignored) {}
+        if (path == null) {
+            status("Mímir can't open files from that location yet — pick it from Documents, Download or Termux");
+            return;
+        }
+        ruby.event("intent.url", "url", FolderAccess.urlFor(path));
     }
 
     private long lastNavMs = 0;
@@ -412,6 +432,13 @@ public class MainActivity extends Activity implements RubyRuntime.Listener {
                 }
                 case "dev.toggle": toggleRubyPane(); break;
                 case "folder.pick": pendingGrantPath = null; pendingGrantTab = -1; launchPicker(null); break;
+                case "file.pick": {
+                    Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+                    i.addCategory(Intent.CATEGORY_OPENABLE);
+                    i.setType("*/*");
+                    try { startActivityForResult(i, REQ_FILE); } catch (Exception e) { status("No file picker available: " + e.getMessage()); }
+                    break;
+                }
                 case "folder.release":
                     folders.release(cmd.optString("path"));
                     ruby.event("folders.changed", "folders", folders.toJson());

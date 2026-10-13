@@ -266,7 +266,7 @@ module UI
     dt = @state["devtools"] || {}
     rows = [
       ["tab.new", "New tab", "+"],
-      ["folder.open", "Open folder…", "📁"],
+      ["file.open", "Open file…", "📄"],
       ["bookmark.toggle", "Bookmark this page", "☆"],
       ["page:bookmarks", "Bookmarks", "›"],
       ["page:history", "History", "›"],
@@ -440,7 +440,7 @@ module UI
     when "bookmark.move"
       send("bookmark.update", "id" => `String(#{target}.dataset.id || "")`, "parent" => `String(#{target}.value || "")`)
     when "bookmarks.bar"   then send("bookmarks.bar")
-    when "ua.toggle", "devtools.toggle", "dock.toggle", "dev.toggle", "devtools.chrome", "settings.open", "about", "donate", "folder.open" then send(act)
+    when "ua.toggle", "devtools.toggle", "dock.toggle", "dev.toggle", "devtools.chrome", "settings.open", "about", "donate", "folder.open", "file.open" then send(act)
     when "billing.buy" then send("billing.buy", "product" => `String(#{target}.dataset.id || "")`)
     when "folder.release" then send("folder.release", "path" => `String(#{target}.dataset.path || "")`)
     when "billing.retry" then send("support.open")
@@ -544,7 +544,7 @@ module UI
   def self.folders_rows
     list = @state["folders"] || []
     if list.empty?
-      return "<div class=\"row\"><div class=\"l\"><b>None yet</b><small>Use ⋮ → Open folder…, or run <code>mimir path/to/index.html</code> in Termux</small></div></div>"
+      return "<div class=\"row\"><div class=\"l\"><b>None yet</b><small>Use ⋮ → Open file…, or run <code>mimir path/to/index.html</code> in Termux</small></div></div>"
     end
     list.map do |f|
       "<div class=\"row\"><div class=\"l\"><b>#{esc(f["label"])}</b><small>#{esc(f["path"])}</small></div>" \

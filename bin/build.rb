@@ -503,11 +503,12 @@ when 'gradle'  then gradle(ARGV[1] || ':app:assembleDebug')
 when 'gbuild'   then gradle(':app:assembleDebug')
 when 'ginstall'
   out = gradle(':app:assembleDebug')
-  # Versioned name: overwriting one file leaves stale dates/sizes in Android's media index.
-  ver = (JSON.parse(File.read(File.join(ROOT, 'mimir.config.json')))['version'] rescue 'dev')
+  # Always Downloads/Mimir.apk (installs over the previous one). Delete first so Android's media
+  # index doesn't keep showing the old file's date and size.
   dl = File.join(Dir.home, 'storage', 'downloads')
   Dir[File.join(dl, 'Mimir-*-debug.apk')].each { |f| FileUtils.rm_f(f) }
-  dest = File.join(dl, "Mimir-#{ver}-debug.apk")
+  dest = File.join(dl, 'Mimir.apk')
+  FileUtils.rm_f(dest)
   FileUtils.cp(out, dest)
   system('termux-media-scan', dest, out: File::NULL, err: File::NULL) if system('command -v termux-media-scan >/dev/null 2>&1')
   system('am', 'start', '-a', 'android.intent.action.VIEW_DOWNLOADS', out: File::NULL, err: File::NULL)

@@ -238,6 +238,8 @@ test "folder events reach Java and folders appear in state" do
   Inspect.emitted.clear
   App.handle({ "ev" => "folder.open" }.to_json)
   assert Inspect.emitted.any? { |c| c["cmd"] == "folder.pick" }
+  App.handle({ "ev" => "file.open" }.to_json)
+  assert Inspect.emitted.any? { |c| c["cmd"] == "file.pick" }
   App.handle({ "ev" => "folders.changed", "folders" => [{ "path" => "/data/data/com.termux/files/home", "label" => "Termux home" }] }.to_json)
   st = Inspect.emitted.reverse.find { |c| c["cmd"] == "ui.state" }["state"]
   assert_equal "Termux home", st["folders"][0]["label"]

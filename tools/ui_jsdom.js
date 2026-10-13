@@ -54,8 +54,8 @@ try {
   click(doc.querySelector('[data-act="ctx:inspect"]'));
   console.log('context action sent:', sent.some(e => e.ev === 'context.action' && e.id === 'inspect' && e.target && e.target.tab === 1), '| closed:', doc.getElementById('ctx').hidden);
   click(doc.querySelector('[data-act="menu.toggle"]'));
-  const of = doc.querySelector('[data-act="folder.open"]'); if (!of) throw new Error('no Open folder menu item'); click(of);
-  console.log('open folder sent:', sent.some(e => e.ev === 'folder.open'));
+  const of = doc.querySelector('[data-act="file.open"]'); if (!of) throw new Error('no Open file menu item'); click(of);
+  console.log('open file sent:', sent.some(e => e.ev === 'file.open'));
   click(doc.querySelector('[data-act="menu.toggle"]')); click(doc.querySelector('[data-act="page:settings"]')); click(doc.querySelector('[data-act="section:privacy"]'));
   console.log('folder list:', doc.getElementById('page').innerHTML.includes('Termux home'));
   click(doc.querySelector('[data-act="folder.release"]'));

@@ -35,7 +35,7 @@ From Termux, open a project the way you would with `chrome index.html` on a desk
 Mímir serves the folder itself at `https://local.mimir/<path>`, so relative links, ES modules and
 `fetch()` work like a real site, and reloading shows your latest edits. The first time, Android asks
 once for folder access: choose **Use this folder** (granting your Termux home covers every project).
-Without Termux, use ⋮ → **Open folder…**; manage granted folders in Settings → Privacy & data.
+Without Termux, use ⋮ → **Open file…**; manage granted folders in Settings → Privacy & data.
 `bin/mimir` is the launcher; link it with `ln -s "$PWD/bin/mimir" "$PREFIX/bin/mimir"`.
 
 ## How it is built
